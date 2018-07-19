@@ -1,0 +1,857 @@
+---
+title: "Contextual Constraint and Preview Time Modulate the Semantic Preview Effect: Evidence from Chinese Sentence Reading"
+author: "Nan Li"
+date: "`r format(Sys.time())`"
+output: 
+    html_document:
+        toc: yes
+        toc_depth: 3
+        number_sections: yes
+---
+
+In this script we document the character-based analyses and graphs reported in Li, Wang, & Kliegl (2016). _Contextual Constraint and Preview Time Modulate the Semantic Preview Effect: Evidence from Chinese Sentence Reading._ Manuscript accepted.  
+
+Some nomenclature
+
+* R3:pre-target character
+* R4:target character
+* R5:post-target character
+
+```{r matlab_to_r}
+library(knitr)
+opts_chunk$set(cache=TRUE)
+options(width=92)
+
+library(R.utils)
+library(R.matlab)
+library(reshape2)
+library(data.table)
+library(MASS)
+library(lme4)
+library(stats)
+library(ggplot2)
+library(languageR)
+library(reshape)
+library(plyr)
+library(lattice)
+```
+
+# Convert from Matlab to R
+
+Need to do this only once. After that the RData file will be available. 
+
+```{r eval=FALSE}
+rm(list=ls())
+input_file = 'Rdata.mat'
+a = readMat(input_file)
+data=as.data.frame(a)
+
+colnames(data) = c('sub','item','con','R3_FFD','R4_FFD','R5_FFD',
+                   'skip_R3','skip_R4','skip_R5','R3_Single','R4_Single','R5_Single',
+                   'R3_Gaze','R4_Gaze','R5_Gaze','R3_RF','R4_RF','R5_RF',
+                   'R3_sec_LR','R4_sec_LR','R5_sec_LR', 'R3_total','R4_total','R5_total',
+                   'R3_gopast','R4_gopast','R5_gopast','R3_regout','R4_regout','R5_regout',
+                   'R3_regin','R4_regin','R5_regin')
+
+
+save(data,file="dataf.Rda")
+
+```
+
+# Setting up
+
+
+```{r setting_up}
+#load("data.Rda")
+
+data1 <- data
+data1$constraint <- ifelse(data1$con==1|data1$con==2|data1$con==3,1,2)
+data1$preview <- ifelse(data1$con==1|data1$con==4,1,2)
+data1_1 <- data1[which(data1$preview==1),]
+data1_2 <- data1[which(data1$preview==2),]
+data1_2$preview <- ifelse(data1_2$con==2|data1_2$con==5,2,3)
+data1 <- rbind(data1_1,data1_2)
+
+data1$preview <- as.factor(data1$preview)
+data1$constraint <- as.factor(data1$constraint)
+data1$sub <- as.factor(data1$sub)
+data1$item <- as.factor(data1$item)
+data1$con <- as.factor(data1$con)
+
+data1$skipR3 <- data1$skip_R3
+data1$skipR4 <- data1$skip_R3
+data1$skipR5 <- data1$skip_R3
+data1$skip_R3 <- as.factor(data1$skip_R3)
+data1$skip_R4 <- as.factor(data1$skip_R4)
+data1$skip_R5 <- as.factor(data1$skip_R5)
+
+data1$previewtype <- data1$preview
+data1$constrainttype <- data1$constraint
+data1$skip_R2type <- data1$skip_R2
+data1$skip_R3type <- data1$skip_R3
+data1$skip_R4type <- data1$skip_R4
+data1$skip_R5type <- data1$skip_R5
+levels(data1$previewtype) <- c("Identical", "Related", "Unrelated")
+levels(data1$constrainttype) <- c("High constraint", "Low constraint")
+levels(data1$skip_R3type) <- c("pre-target_skip", "pre-target_not skip")
+levels(data1$skip_R4type) <- c("target_skip", "target_not skip")
+levels(data1$skip_R5type) <- c("post-target_skip", "post-target_not skip")
+
+
+# transform the dV
+
+data1$R3_FFD.log <- log(data1$R3_FFD)
+data1$R4_FFD.log <- log(data1$R4_FFD)
+data1$R5_FFD.log <- log(data1$R5_FFD)
+
+data1$R3_Gaze.log <- log(data1$R3_Gaze)
+data1$R4_Gaze.log <- log(data1$R4_Gaze)
+data1$R5_Gaze.log <- log(data1$R5_Gaze)
+
+data1$R3_Single.log <- log(data1$R3_Single)
+data1$R4_Single.log <- log(data1$R4_Single)
+data1$R5_Single.log <- log(data1$R5_Single)
+
+data1$R3_total.log <- log(data1$R3_total)
+data1$R4_total.log <- log(data1$R4_total)
+data1$R5_total.log <- log(data1$R5_total)
+
+data1$R3_sec_LR.log <- log(data1$R3_sec_LR)
+data1$R4_sec_LR.log <- log(data1$R4_sec_LR)
+data1$R5_sec_LR.log <- log(data1$R5_sec_LR)
+
+data1$R3_gopast.log <- log(data1$R3_gopast)
+data1$R4_gopast.log <- log(data1$R4_gopast)
+data1$R5_gopast.log <- log(data1$R5_gopast)
+
+# filter the data
+# FFD
+data3_FFD <- data1[(data1$R3_FFD)>0,]
+data4_FFD <- data1[(data1$R4_FFD)>0,]
+data5_FFD <- data1[(data1$R5_FFD)>0,]
+
+# Single
+data3_Single <- data1[(data1$R3_Single)>0,]
+data4_Single <- data1[(data1$R4_Single)>0,]
+data5_Single <- data1[(data1$R5_Single)>0,]
+
+# Gaze
+data3_Gaze <- data1[(data1$R3_Gaze)>0,]
+data4_Gaze <- data1[(data1$R4_Gaze)>0,]
+data5_Gaze <- data1[(data1$R5_Gaze)>0,]
+
+# total 
+data3_total <- data1[(data1$R3_total)>0,]
+data4_total <- data1[(data1$R4_total)>0,]
+data5_total <- data1[(data1$R5_total)>0,]
+
+# sce_LR 
+data3_sec_LR <- data1[(data1$R3_sec_LR)>0,]
+data4_sec_LR <- data1[(data1$R4_sec_LR)>0,]
+data5_sec_LR <- data1[(data1$R5_sec_LR)>0,]
+
+# gopast
+data3_gopast <- data1[(data1$R3_gopast)>0,]
+data4_gopast <- data1[(data1$R4_gopast)>0,]
+data5_gopast <- data1[(data1$R5_gopast)>0,]
+
+
+## contrast
+# for main effect and interaction 
+cmat.R1   <- matrix(c(+1/3, +1/3, +1/3, -1/3, -1/3, -1/3,          # F
+                      -1/2, 0,    +1/2, -1/2, 0,    +1/2,          # c - a
+                      0, -1/2, +1/2,    0, -1/2, +1/2,          # c - b
+                      -1/2, 0,   +1/2, +1/2, 0,    -1/2,          # F x (c-a)
+                      0, -1/2, +1/2,    0, +1/2, -1/2),  6,  5) # F x (c-b)
+
+# for post-hoc analysis
+cmat.R2   <- matrix(c(-1/3, -1/3, -1/3, +1/3, +1/3, +1/3,           # F
+                        -1,   0,    +1,    0,    0,    0,           # c - a | B_A == A1
+                         0,   -1,   +1,    0,    0,    0,           # c - b | B_A == A1
+                         0,    0,    0,   -1,    0,   +1,           # c - a | B_A == A2
+                         0,    0,    0,    0,   -1,   +1),  6,  5)  # c - b | B_A == A2
+
+cmat.R1.i <- fractions(t(ginv(cmat.R1)))
+colnames(cmat.R1.i) = c('_constraint', '_unrelated:identical', '_unrelated:related','constraint* (unrelated:identical)','constraint*(unrelated:related)')
+cmat.R2.i <- fractions(t(ginv(cmat.R2)))
+colnames(cmat.R2.i) = c('_constraint', '_unrelated:identical(high)', '_unrelated:related (high)','unrelated:identical(low)','unrelated:related(low)')
+
+data1$con <- C(data1$con, cmat.R1.i, 5)
+data3_FFD$con <- C(data3_FFD$con, cmat.R1.i, 5)
+data4_FFD$con <- C(data4_FFD$con, cmat.R1.i, 5)
+data5_FFD$con <- C(data5_FFD$con, cmat.R1.i, 5)
+data3_Single$con <- C(data3_Single$con, cmat.R1.i, 5)
+data4_Single$con <- C(data4_Single$con, cmat.R1.i, 5)
+data5_Single$con <- C(data5_Single$con, cmat.R1.i, 5)
+data3_Gaze$con <- C(data3_Gaze$con, cmat.R1.i, 5)
+data4_Gaze$con <- C(data4_Gaze$con, cmat.R1.i, 5)
+data5_Gaze$con <- C(data5_Gaze$con, cmat.R1.i, 5)
+data3_total$con <- C(data3_total$con, cmat.R1.i, 5)
+data4_total$con <- C(data4_total$con, cmat.R1.i, 5)
+data5_total$con <- C(data5_total$con, cmat.R1.i, 5)
+data3_sec_LR$con <- C(data3_sec_LR$con, cmat.R1.i, 5)
+data4_sec_LR$con <- C(data4_sec_LR$con, cmat.R1.i, 5)
+data5_sec_LR$con <- C(data5_sec_LR$con, cmat.R1.i, 5)
+data3_gopast$con <- C(data3_gopast$con, cmat.R1.i, 5)
+data4_gopast$con <- C(data4_gopast$con, cmat.R1.i, 5)
+data5_gopast$con <- C(data5_gopast$con, cmat.R1.i, 5)
+
+### Contrasts as numeric covariates (vector valued)
+
+mm <- model.matrix(~ con, data=data1)
+data1$c <- mm[, 2]
+data1$ui <- mm[, 3]
+data1$ur <- mm[, 4]
+data1$c_ui <- mm[, 5]
+data1$c_ur <- mm[, 6]
+
+mm3_FFD <- model.matrix(~ con, data=data3_FFD)
+data3_FFD$c <- mm3_FFD[, 2]
+data3_FFD$ui <- mm3_FFD[, 3]
+data3_FFD$ur <- mm3_FFD[, 4]
+data3_FFD$c_ui <- mm3_FFD[, 5]
+data3_FFD$c_ur <- mm3_FFD[, 6]
+
+mm4_FFD <- model.matrix(~ con, data=data4_FFD)
+data4_FFD$c <- mm4_FFD[, 2]
+data4_FFD$ui <- mm4_FFD[, 3]
+data4_FFD$ur <- mm4_FFD[, 4]
+data4_FFD$c_ui <- mm4_FFD[, 5]
+data4_FFD$c_ur <- mm4_FFD[, 6]
+
+mm5_FFD <- model.matrix(~ con, data=data5_FFD)
+data5_FFD$c <- mm5_FFD[, 2]
+data5_FFD$ui <- mm5_FFD[, 3]
+data5_FFD$ur <- mm5_FFD[, 4]
+data5_FFD$c_ui <- mm5_FFD[, 5]
+data5_FFD$c_ur <- mm5_FFD[, 6]
+
+mm3_Gaze <- model.matrix(~ con, data=data3_Gaze)
+data3_Gaze$c <- mm3_Gaze[, 2]
+data3_Gaze$ui <- mm3_Gaze[, 3]
+data3_Gaze$ur <- mm3_Gaze[, 4]
+data3_Gaze$c_ui <- mm3_Gaze[, 5]
+data3_Gaze$c_ur <- mm3_Gaze[, 6]
+
+mm4_Gaze <- model.matrix(~ con, data=data4_Gaze)
+data4_Gaze$c <- mm4_Gaze[, 2]
+data4_Gaze$ui <- mm4_Gaze[, 3]
+data4_Gaze$ur <- mm4_Gaze[, 4]
+data4_Gaze$c_ui <- mm4_Gaze[, 5]
+data4_Gaze$c_ur <- mm4_Gaze[, 6]
+
+mm5_Gaze <- model.matrix(~ con, data=data5_Gaze)
+data5_Gaze$c <- mm5_Gaze[, 2]
+data5_Gaze$ui <- mm5_Gaze[, 3]
+data5_Gaze$ur <- mm5_Gaze[, 4]
+data5_Gaze$c_ui <- mm5_Gaze[, 5]
+data5_Gaze$c_ur <- mm5_Gaze[, 6]
+
+mm3_Single <- model.matrix(~ con, data=data3_Single)
+data3_Single$c <- mm3_Single[, 2]
+data3_Single$ui <- mm3_Single[, 3]
+data3_Single$ur <- mm3_Single[, 4]
+data3_Single$c_ui <- mm3_Single[, 5]
+data3_Single$c_ur <- mm3_Single[, 6]
+
+mm4_Single <- model.matrix(~ con, data=data4_Single)
+data4_Single$c <- mm4_Single[, 2]
+data4_Single$ui <- mm4_Single[, 3]
+data4_Single$ur <- mm4_Single[, 4]
+data4_Single$c_ui <- mm4_Single[, 5]
+data4_Single$c_ur <- mm4_Single[, 6]
+
+mm5_Single <- model.matrix(~ con, data=data5_Single)
+data5_Single$c <- mm5_Single[, 2]
+data5_Single$ui <- mm5_Single[, 3]
+data5_Single$ur <- mm5_Single[, 4]
+data5_Single$c_ui <- mm5_Single[, 5]
+data5_Single$c_ur <- mm5_Single[, 6]
+
+mm3_total <- model.matrix(~ con, data=data3_total)
+data3_total$c <- mm3_total[, 2]
+data3_total$ui <- mm3_total[, 3]
+data3_total$ur <- mm3_total[, 4]
+data3_total$c_ui <- mm3_total[, 5]
+data3_total$c_ur <- mm3_total[, 6]
+
+mm4_total <- model.matrix(~ con, data=data4_total)
+data4_total$c <- mm4_total[, 2]
+data4_total$ui <- mm4_total[, 3]
+data4_total$ur <- mm4_total[, 4]
+data4_total$c_ui <- mm4_total[, 5]
+data4_total$c_ur <- mm4_total[, 6]
+
+mm5_total <- model.matrix(~ con, data=data5_total)
+data5_total$c <- mm5_total[, 2]
+data5_total$ui <- mm5_total[, 3]
+data5_total$ur <- mm5_total[, 4]
+data5_total$c_ui <- mm5_total[, 5]
+data5_total$c_ur <- mm5_total[, 6]
+
+mm3_sec_LR <- model.matrix(~ con, data=data3_sec_LR)
+data3_sec_LR$c <- mm3_sec_LR[, 2]
+data3_sec_LR$ui <- mm3_sec_LR[, 3]
+data3_sec_LR$ur <- mm3_sec_LR[, 4]
+data3_sec_LR$c_ui <- mm3_sec_LR[, 5]
+data3_sec_LR$c_ur <- mm3_sec_LR[, 6]
+
+mm4_sec_LR <- model.matrix(~ con, data=data4_sec_LR)
+data4_sec_LR$c <- mm4_sec_LR[, 2]
+data4_sec_LR$ui <- mm4_sec_LR[, 3]
+data4_sec_LR$ur <- mm4_sec_LR[, 4]
+data4_sec_LR$c_ui <- mm4_sec_LR[, 5]
+data4_sec_LR$c_ur <- mm4_sec_LR[, 6]
+
+mm5_sec_LR <- model.matrix(~ con, data=data5_sec_LR)
+data5_sec_LR$c <- mm5_sec_LR[, 2]
+data5_sec_LR$ui <- mm5_sec_LR[, 3]
+data5_sec_LR$ur <- mm5_sec_LR[, 4]
+data5_sec_LR$c_ui <- mm5_sec_LR[, 5]
+data5_sec_LR$c_ur <- mm5_sec_LR[, 6]
+
+mm3_gopast <- model.matrix(~ con, data=data3_gopast)
+data3_gopast$c <- mm3_gopast[, 2]
+data3_gopast$ui <- mm3_gopast[, 3]
+data3_gopast$ur <- mm3_gopast[, 4]
+data3_gopast$c_ui <- mm3_gopast[, 5]
+data3_gopast$c_ur <- mm3_gopast[, 6]
+
+mm4_gopast <- model.matrix(~ con, data=data4_gopast)
+data4_gopast$c <- mm4_gopast[, 2]
+data4_gopast$ui <- mm4_gopast[, 3]
+data4_gopast$ur <- mm4_gopast[, 4]
+data4_gopast$c_ui <- mm4_gopast[, 5]
+data4_gopast$c_ur <- mm4_gopast[, 6]
+
+mm5_gopast <- model.matrix(~ con, data=data5_gopast)
+data5_gopast$c <- mm5_gopast[, 2]
+data5_gopast$ui <- mm5_gopast[, 3]
+data5_gopast$ur <- mm5_gopast[, 4]
+data5_gopast$c_ui <- mm5_gopast[, 5]
+data5_gopast$c_ur <- mm5_gopast[, 6]
+```
+
+here is the primary analysis in the paper.
+
+# Pretarget analysis 
+These are the analysis reported in the pre-target character (p11 in the paper)
+
+## First-fixation duration
+  
+```{r R3_ffd}
+(M<- ddply(data3_FFD, .(constrainttype, previewtype), summarise, M_pretarget_FFD = round(mean(R3_FFD)), SD = round(sd (R3_FFD)), SE = sd(R3_FFD)/sqrt(length(R3_FFD)), N = length(R3_FFD)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_FFD, group = constrainttype, colour = constrainttype,geom=c("point", "line")) + scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_FFD + SE, ymin = M_pretarget_FFD - SE), width=.1) + theme_bw()
+
+print(summary(mR3_FFDd <- lmer(R3_FFD.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data3_FFD, REML = FALSE)), cor=FALSE)
+
+
+```
+
+## Gaze duration
+
+```{r R3_gd}
+(M<- ddply(data3_Gaze, .(constrainttype, previewtype), summarise, M_pretarget_Gaze = round(mean(R3_Gaze)), SD = round(sd (R3_Gaze)), SE = sd(R3_Gaze)/sqrt(length(R3_Gaze)), N = length(R3_Gaze)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_Gaze, group = constrainttype, colour = constrainttype,geom=c("point", "line")) + scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_Gaze + SE, ymin = M_pretarget_Gaze - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR3_Gazed <- lmer(R3_Gaze.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ri + ur + c_ui + c_ur || item), data=data3_Gaze, REML = FALSE)), cor=FALSE)
+
+```
+
+## Fixation rates
+
+```{r R3_fr}
+(M <- ddply(data1, .(constrainttype, previewtype), summarise, M_pretarget_fixationrate = mean(skipR3), SD = sd (skipR3), SE = sd(skipR3)/sqrt(length(skipR3)), N = length(skipR3)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_fixationrate, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_fixationrate + SE, ymin = M_pretarget_fixationrate - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR3_skip_d<- glmer(skip_R3 ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur  +  c_ui + c_ur || sub) + (1 + c + ui + ur + c_ui + c_ur || item),family = "binomial", data=data1)),cor=FALSE)
+
+```
+
+# Target analysis
+
+## Regression of R4_FFD.log on prior fixation (R3_SFD) duration.log 
+These are the critical tests of the preview time x context x relatedness interactions, reported in the paper. We analyze effects on FFD and GD using preview SFD as covariate. (p11-p13)
+
+### LMM - FFD 
+
+```{r DV_sfd}
+ix <- which(data4_FFD$R3_Single>0) 
+data1d<- data4_FFD[ix, ] 
+data1d$prior<-data1d$R3_Single
+data1d$prior.log<-(data1d$prior)
+data1d$cov <- scale(data1d$prior.log, scale=FALSE) 
+
+# for main effect and interaction
+data1d$con <- C(data1d$con, cmat.R1.i, 5)
+mm1d <- model.matrix(~ con, data=data1d)
+data1d$c <- mm1d[, 2]
+data1d$ui <- mm1d[, 3]
+data1d$ur <- mm1d[, 4]
+data1d$c_ri <- mm1d[, 5]
+data1d$c_ur <- mm1d[, 6]
+print(summary(mR3_prior.cov_d <- lmer(R4_FFD.log ~ (c + ui + ur + c_ui + c_ur)*cov + (1 + c + ui + ur + c_ui + c_ur + cov  || sub) + (1 + c + ui + ur + c_ui + c_ur + cov || item), data=data1d, REML = FALSE)), cor=FALSE)
+
+# for post-hoc analysis
+data1d$con <- C(data1d$con, cmat.R2.i, 5)
+mm1d <- model.matrix(~ con, data=data1d)
+data1d$c <- mm1d[, 2]
+data1d$ui_H <- mm1d[, 3]
+data1d$ur_H <- mm1d[, 4]
+data1d$ui_L <- mm1d[, 5]
+data1d$ur_L <- mm1d[, 6]
+print(summary(mR3_prior.cov_d1 <- lmer(R4_FFD.log ~ (c + ui_H + ur_H + ui_L + ur_L)*cov + (1 + c + ui_H + ur_H + ui_L + ur_L + cov  || sub) + (1 + c + ui_H + ur_H + ui_L + ur_L + cov || item), data=data1d, REML = FALSE)), cor=FALSE)
+
+```
+
+### Graph - FFD 
+
+```{r graph_DV_sfd}
+source("remef.v0.6.10.R")
+
+data1d$p_con_spb_cov <- exp(remef(mR3_prior.cov_d, keep=TRUE, fix=1:10, ran=NULL))
+plot <- qplot(data=data1d, x=prior.log, y=p_con_spb_cov, group=previewtype, colour=previewtype,linetype = previewtype,
+                               geom="smooth", method="lm", se=F, facets=.~constrainttype)  +
+       scale_colour_manual(values=c("black", "black", "black", "black", "black")) +
+       scale_size_manual(values=c(1.5, 1.5, 1.5)) +
+       scale_linetype_manual(values=c(1, 2, 3)) +
+       scale_x_continuous("Pre-target SFD  [ms]", breaks=seq(100, 500, 100), trans="log") +
+       scale_y_continuous("Target FFD [ms]", breaks=seq(200, 500, 25), trans="log") +
+       ggtitle("Interaction between Preview, Constraint, and Pre-target SFD") + 
+       theme(axis.title = element_text(size=18), axis.text = element_text(size=14),
+                         plot.title = element_text(colour="black", size=20)) + theme_bw()
+plot
+
+```
+
+
+## Regression of R4_Gaze.log on prior fixation (R3_SFD) duration.log
+
+### LMM/Graph - GD
+
+```{r DV_gd}
+# for main effect and interaction
+data1d$con <- C(data1d$con, cmat.R1.i, 5)
+mm1d <- model.matrix(~ con, data=data1d)
+data1d$c <- mm1d[, 2]
+data1d$ui <- mm1d[, 3]
+data1d$ur <- mm1d[, 4]
+data1d$c_ri <- mm1d[, 5]
+data1d$c_ur <- mm1d[, 6]
+print(summary(mR3_prior.cov_d <- lmer(R4_Gaze.log ~ (c + ui + ur + c_ui + c_ur)*cov + (1 + c + ui + ur + c_ui + c_ur + cov  || sub) + (1 + c + ui + ur + c_ui + c_ur + cov || item), data=data1d, REML = FALSE)), cor=FALSE)
+
+# for post-hoc analysis
+data1d$con <- C(data1d$con, cmat.R2.i, 5)
+mm1d <- model.matrix(~ con, data=data1d)
+data1d$c <- mm1d[, 2]
+data1d$ui_H <- mm1d[, 3]
+data1d$ur_H <- mm1d[, 4]
+data1d$ui_L <- mm1d[, 5]
+data1d$ur_L <- mm1d[, 6]
+print(summary(mR3_prior.cov_d1 <- lmer(R4_Gaze.log ~ (c + ui_H + ur_H + ui_L + ur_L)*cov + (1 + c + ui_H + ur_H + ui_L + ur_L + cov  || sub) + (1 + c + ui_H + ur_H + ui_L + ur_L + cov || item), data=data1d, REML = FALSE)), cor=FALSE)
+
+# for Graph
+data1d$p_con_spb_cov <- exp(remef(mR3_prior.cov_d, keep=TRUE, fix=1:10, ran=NULL))
+plot <- qplot(data=data1d, x=prior.log, y=p_con_spb_cov, group=previewtype, colour=previewtype,linetype = previewtype,
+              geom="smooth", method="lm", se=F,facets=.~constrainttype)  +
+  scale_colour_manual(values=c("black", "black", "black", "black", "black")) +
+  scale_size_manual(values=c(1.5, 1.5, 1.5)) +
+  scale_linetype_manual(values=c(1, 2, 3)) +
+  scale_x_continuous("pre-target SFD [ms]", breaks=seq(100, 500, 100), trans="log") +
+  scale_y_continuous("Target GD [ms]", breaks=seq(200, 500, 25), trans="log") +
+  ggtitle("Interaction between Preview, Constraint, and Pre-target SFD") + 
+  theme(axis.title = element_text(size=18), axis.text = element_text(size=14),
+        plot.title = element_text(colour="black", size=20)) + theme_bw()
+plot
+
+```
+
+## Cut point 
+here are the tests for short and long previews
+
+```{r cut_point}
+
+data1d_H <- data1d[which(data1d$constraint==1),] 
+data1d_L <- data1d[which(data1d$constraint==2),] 
+data1d_H$sort <- sort(data1d_H$prior) 
+data1d_L$sort <- sort(data1d_L$prior) 
+median(data1d_H$prior)
+data1d_H$p <- ifelse(data1d_H$prior <=221,1,2)  
+data1d_HR <- data1d_H[which(data1d_H$p==1),] 
+data1d_HY <- data1d_H[which(data1d_H$p==2),] 
+data1d_H$p <- as.factor(data1d_H$p)
+median(data1d_L$prior)
+data1d_L$p <- ifelse(data1d_L$prior <=222,1,2)
+data1d_LR <- data1d_L[which(data1d_L$p==1),] 
+data1d_LY <- data1d_L[which(data1d_L$p==2),] 
+data1d_L$p=as.factor(data1d_L$p)
+data1d=rbind(data1d_H,data1d_L)
+data1d$p=as.factor(data1d$p)
+
+data1d$con <- C(data1d$con, cmat.R2.i, 5)
+mm1d <- model.matrix(~ con, data=data1d)
+data1d$c <- mm1d[, 2]
+data1d$ui_H <- mm1d[, 3]
+data1d$ur_H <- mm1d[, 4]
+data1d$ui_L <- mm1d[, 5]
+data1d$ur_L <- mm1d[, 6]
+
+# tests for short previews 
+contrasts(data1d$p) <- contr.treatment(2,base=1)
+print(summary(mR3_prior.cov_d <- lmer(R4_FFD.log ~ (c + ui_H + ur_H + ui_L + ur_L)*p + (1 + c + ui_H + ur_H + ui_L + ur_L + p  || sub) + (1 + c + ui_H + ur_H + ui_L + ur_L + p || item), data=data1d, REML = FALSE)), cor=FALSE)
+print(summary(mR3_prior.cov_d <- lmer(R4_Gaze.log ~ (c + ui_H + ur_H + ui_L + ur_L)*p + (1 + c + ui_H + ur_H + ui_L + ur_L + p  || sub) + (1 + c + ui_H + ur_H + ui_L + ur_L + p || item), data=data1d, REML = FALSE)), cor=FALSE)
+
+# tests for long previews 
+contrasts(data1d$p)=contr.treatment(2,base=2)
+print(summary(mR3_prior.cov_d <- lmer(R4_FFD.log ~ (c + ui_H + ur_H + ui_L + ur_L)*p + (1 + c + ui_H + ur_H + ui_L + ur_L + p  || sub) + (1 + c + ui_H + ur_H + ui_L + ur_L + p || item), data=data1d, REML = FALSE)), cor=FALSE)
+print(summary(mR3_prior.cov_d <- lmer(R4_Gaze.log ~ (c + ui_H + ur_H + ui_L + ur_L)*p + (1 + c + ui_H + ur_H + ui_L + ur_L + p  || sub) + (1 + c + ui_H + ur_H + ui_L + ur_L + p || item), data=data1d, REML = FALSE)), cor=FALSE)
+```
+
+## Skipping of pre-target
+
+```{r}
+ix <- which(data4_FFD$skip_R3 == 0)
+data4_FFD <- data4_FFD[ix, ] 
+print(summary(mR3_FFDd <- lmer(R4_FFD.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur  || item), data=data4_FFD, REML = FALSE)), cor=FALSE)
+
+ix <- which(data4_Gaze$skip_R3 == 0)
+data4_Gaze <- data4_Gaze[ix, ] 
+print(summary(mR3_FFDd <- lmer(R4_Gaze.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data4_Gaze, REML = FALSE)), cor=FALSE)
+```
+
+## Fixation rates
+
+```{r R4_fr}
+(M<- ddply(data1, .(constrainttype, previewtype), summarise, M_target_fixationrate = mean(skipR4), SD = sd (skipR4), SE = sd(skipR4)/sqrt(length(skipR4)), N = length(skipR4)))
+
+qplot(data = M, x = previewtype, y = M_target_fixationrate, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_target_fixationrate + SE, ymin = M_target_fixationrate - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR4_skip_d<- glmer(skip_R4 ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur  + + c_ui + c_ur || sub) + (1 + c + ui + ur + c_ui + c_ur || item),family = "binomial", data=data1)),cor=FALSE)
+
+```
+
+# Post-target analysis
+here are tests for post-target character(p13-p14)
+
+## First-fixation duration
+
+```{r R5_ffd}
+(M <- ddply(data5_FFD, .(constrainttype, previewtype), summarise, M_posttarget_FFD = round(mean(R5_FFD)), SD = round(sd (R5_FFD)), SE = round(sd(R5_FFD)/sqrt(length(R5_FFD))), N = round(length(R5_FFD))))
+
+qplot(data = M, x = previewtype, y = M_posttarget_FFD, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_posttarget_FFD + SE, ymin = M_posttarget_FFD - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR5_FFDd <- lmer(R5_FFD.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data5_FFD, REML = FALSE)), cor=FALSE)
+
+```
+
+## Gaze duration
+
+```{r R5_gd}
+(M <- ddply(data5_Gaze, .(constrainttype, previewtype), summarise, M_posttarget_Gaze = round(mean(R5_Gaze)), SD = round(sd (R5_Gaze)), SE = round(sd(R5_Gaze)/sqrt(length(R5_Gaze))), N = round(length(R5_Gaze))))
+
+qplot(data = M, x = previewtype, y = M_posttarget_Gaze, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_posttarget_Gaze + SE, ymin = M_posttarget_Gaze - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR5_Gazed <- lmer(R5_Gaze.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data5_Gaze, REML = FALSE)), cor=FALSE)
+
+```
+
+## Skipping target R4 
+
+```{r R5_Skip_R4}
+ix <- which(data5_FFD$skip_R4 == 0)
+data1d <- data5_FFD[ix, ] 
+print(summary(mR3_prior.cov_dF <- lmer(R5_FFD.log ~ c + ui + ur + c_ui + c_ur+ (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data1d, REML = FALSE)), cor=FALSE)
+print(summary(mR3_prior.cov_dG <- lmer(R5_Gaze.log ~ c + ui + ur + c_ui + c_ur+ (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data1d, REML = FALSE)), cor=FALSE)
+
+```
+
+## Fixation on target R4 (no skipping)
+
+```{r R5_noskip_R4}
+ix <- which(data5_FFD$skip_R4 == 1)
+data1d <- data5_FFD[ix, ]  
+print(summary(mR3_FFDd <- lmer(R5_FFD.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data1d, REML = FALSE)), cor=FALSE)
+print(summary(mR3_FFDd <- lmer(R5_Gaze.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data1d, REML = FALSE)), cor=FALSE)
+```
+
+## Fixation rates
+
+```{r R5_fr}
+(M<- ddply(data1, .(constrainttype, previewtype), summarise, M_posttarget_fixationrate = mean(skipR5), SD = sd (skipR5), SE = sd(skipR5)/sqrt(length(skipR5)), N = length(skipR5)))
+
+qplot(data = M, x = previewtype, y = M_posttarget_fixationrate, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_posttarget_fixationrate + SE, ymin = M_posttarget_fixationrate - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR5_skip_d<- glmer(skip_R5 ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur  + + c_ui + c_ur || sub) + (1 + c + ui + ur + c_ui + c_ur || item),family = "binomial", data=data1)),cor=FALSE)
+
+
+```
+
+## other analysis not reported in the paper
+
+# Pretarget analysis
+
+## Single-fixation duration
+
+```{r R3_sfd}
+(M<- ddply(data3_Single, .(constrainttype, previewtype), summarise, M_pretarget_Single = round(mean(R3_Single)), SD = round(sd (R3_Single)), SE = sd(R3_Single)/sqrt(length(R3_Single)), N = length(R3_Single)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_Single, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_Single + SE, ymin = M_pretarget_Single - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR3_Singled <- lmer(R3_Single.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data3_Single, REML = FALSE)), cor=FALSE)
+
+```
+
+## Total reading time
+
+```{r R3_total}
+(M<- ddply(data3_total, .(constrainttype, previewtype), summarise, M_pretarget_total = round(mean(R3_total)), SD = round(sd (R3_total)), SE = sd(R3_total)/sqrt(length(R3_total)), N = length(R3_total)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_total, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_total + SE, ymin = M_pretarget_total - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR3_totald <- lmer(R3_total.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data3_total, REML = FALSE)), cor=FALSE)
+
+```
+
+## sec_LR
+
+```{r R3_sec_LR}
+(M<- ddply(data3_sec_LR, .(constrainttype, previewtype), summarise, M_pretarget_sec_LR = round(mean(R3_sec_LR)), SD = round(sd (R3_sec_LR)), SE = sd(R3_sec_LR)/sqrt(length(R3_sec_LR)), N = length(R3_sec_LR)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_sec_LR, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_sec_LR + SE, ymin = M_pretarget_sec_LR - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR3_sec_LRd <- lmer(R3_sec_LR.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data3_sec_LR, REML = FALSE)), cor=FALSE)
+
+
+```
+
+## Go-past time
+
+```{r R3_gopast}
+(M<- ddply(data3_gopast, .(constrainttype, previewtype), summarise, M_pretarget_gopast = round(mean(R3_gopast)), SD = round(sd (R3_gopast)), SE = sd(R3_gopast)/sqrt(length(R3_gopast)), N = length(R3_gopast)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_gopast, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_gopast + SE, ymin = M_pretarget_gopast - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR3_gopastd <- lmer(R3_gopast.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data3_gopast, REML = FALSE)), cor=FALSE)
+
+```
+
+### Regout
+
+```{r R3_regout}
+(M <- ddply(data1, .(constrainttype, previewtype), summarise, M_pretarget_fixationrate = mean(R3_regout), SD = sd (R3_regout), SE = sd(R3_regout)/sqrt(length(R3_regout)), N = length(R3_regout)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_fixationrate, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_fixationrate + SE, ymin = M_pretarget_fixationrate - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR3_regout_d<- glmer(R3_regout ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur  + + c_ui + c_ur || sub) + (1 + c + ui + ur + c_ui + c_ur || item),family = "binomial", data=data1)),cor=FALSE)
+
+```
+
+### Regin
+
+```{r R3_regin}
+(M <- ddply(data1, .(constrainttype, previewtype), summarise, M_pretarget_fixationrate = mean(R3_regin), SD = sd (R3_regin), SE = sd(R3_regin)/sqrt(length(R3_regin)), N = length(R3_regin)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_fixationrate, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_fixationrate + SE, ymin = M_pretarget_fixationrate - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR3_regin_d<- glmer(R3_regin ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur  + + c_ui + c_ur || sub) + (1 + c + ui + ur + c_ui + c_ur || item),family = "binomial", data=data1)),cor=FALSE)
+
+```
+
+# Target analysis
+
+
+## Single-fixation duration
+
+```{r R4_sfd}
+(M <- ddply(data4_Single, .(constrainttype, previewtype), summarise, M_target_Single = round(mean(R4_Single)), SD = round(sd (R4_Single)), SE = round(sd(R4_Single)/sqrt(length(R4_Single))), N = round(length(R4_Single))))
+
+qplot(data = M, x = previewtype, y = M_target_Single, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_target_Single + SE, ymin = M_target_Single - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR4_Singled <- lmer(R4_Single.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data4_Single, REML = FALSE)), cor=FALSE)
+
+
+```
+
+## Total duration
+
+```{r R4_total}
+(M <- ddply(data4_total, .(constrainttype, previewtype), summarise, M_pretarget_total = round(mean(R4_total)), SD = round(sd (R4_total)), SE = sd(R4_total)/sqrt(length(R4_total)), N = length(R4_total)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_total, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_total + SE, ymin = M_pretarget_total - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR4_totald <- lmer(R4_total.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data4_total, REML = FALSE)), cor=FALSE)
+
+```
+
+## sec_LR
+
+```{r R4_sec_LR}
+(M <- ddply(data4_sec_LR, .(constrainttype, previewtype), summarise, M_pretarget_sec_LR = round(mean(R4_sec_LR)), SD = round(sd (R4_sec_LR)), SE = sd(R4_sec_LR)/sqrt(length(R4_sec_LR)), N = length(R4_sec_LR)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_sec_LR, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_sec_LR + SE, ymin = M_pretarget_sec_LR - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR4_sec_LRd <- lmer(R4_sec_LR.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data4_sec_LR, REML = FALSE)), cor=FALSE)
+
+```
+
+## Go-past time
+
+```{r R4_gopast}
+(M <- ddply(data4_gopast, .(constrainttype, previewtype), summarise, M_pretarget_gopast = round(mean(R4_gopast)), SD = round(sd (R4_gopast)), SE = sd(R4_gopast)/sqrt(length(R4_gopast)), N = length(R4_gopast)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_gopast, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_gopast + SE, ymin = M_pretarget_gopast - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR4_gopastd <- lmer(R4_gopast.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data4_gopast, REML = FALSE)), cor=FALSE)
+
+```
+
+## Regout
+```{r R4_regout}
+(M <- ddply(data1, .(constrainttype, previewtype), summarise, M_pretarget_fixationrate = mean(R4_regout), SD = sd (R4_regout), SE = sd(R4_regout)/sqrt(length(R4_regout)), N = length(R4_regout)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_fixationrate, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_fixationrate + SE, ymin = M_pretarget_fixationrate - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR4_regout_d<- glmer(R4_regout ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur  + + c_ui + c_ur || sub) + (1 + c + ui + ur + c_ui + c_ur || item),family = "binomial", data=data1)),cor=FALSE)
+
+
+```
+
+### Regin
+
+```{r R4_regin}
+(M <- ddply(data1, .(constrainttype, previewtype), summarise, M_pretarget_fixationrate = mean(R4_regin), SD = sd (R4_regin), SE = sd(R4_regin)/sqrt(length(R4_regin)), N = length(R4_regin)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_fixationrate, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_fixationrate + SE, ymin = M_pretarget_fixationrate - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR4_regin_d<- glmer(R4_regin ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur  + + c_ui + c_ur || sub) + (1 + c + ui + ur + c_ui + c_ur || item),family = "binomial", data=data1)),cor=FALSE)
+
+
+```
+# Post-target analysis
+
+## Single-fixation duration
+
+```{r R5_sfd}
+(M <- ddply(data5_Single, .(constrainttype, previewtype), summarise, M_posttarget_Single = round(mean(R5_Single)), SD = round(sd (R5_Single)), SE = round(sd(R5_Single)/sqrt(length(R5_Single))), N = round(length(R5_Single))))
+
+qplot(data = M, x = previewtype, y = M_posttarget_Single, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_posttarget_Single + SE, ymin = M_posttarget_Single - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR5_Singled <- lmer(R5_Single.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data5_Single, REML = FALSE)), cor=FALSE)
+
+```
+
+## Total reading time
+
+```{r R5_total}
+(M <- ddply(data5_total, .(constrainttype, previewtype), summarise, M_pretarget_total = round(mean(R5_total)), SD = round(sd (R5_total)), SE = sd(R5_total)/sqrt(length(R5_total)), N = length(R5_total)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_total, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_total + SE, ymin = M_pretarget_total - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR5_totald <- lmer(R5_total.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data5_total, REML = FALSE)), cor=FALSE)
+
+
+```
+
+## sec_LR
+
+```{r R5_sec_LR}
+(M <- ddply(data5_sec_LR, .(constrainttype, previewtype), summarise, M_pretarget_sec_LR = round(mean(R5_sec_LR)), SD = round(sd (R5_sec_LR)), SE = sd(R5_sec_LR)/sqrt(length(R5_sec_LR)), N = length(R5_sec_LR)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_sec_LR, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_sec_LR + SE, ymin = M_pretarget_sec_LR - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR5_sec_LRd <- lmer(R5_sec_LR.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data5_sec_LR, REML = FALSE)), cor=FALSE)
+
+
+```
+
+## Go-past time
+
+```{r R5_gopast}
+(M <- ddply(data5_gopast, .(constrainttype, previewtype), summarise, M_pretarget_gopast = round(mean(R5_gopast)), SD = round(sd (R5_gopast)), SE = sd(R5_gopast)/sqrt(length(R5_gopast)), N = length(R5_gopast)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_gopast, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_gopast + SE, ymin = M_pretarget_gopast - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR5_gopastd <- lmer(R5_gopast.log ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur + c_ui + c_ur  || sub) + (1 + c + ui + ur + c_ui + c_ur || item), data=data5_gopast, REML = FALSE)), cor=FALSE)
+
+
+```
+
+### Regout
+
+```{r R5_regout}
+(M<- ddply(data1, .(constrainttype, previewtype), summarise, M_pretarget_fixationrate = mean(R5_regout), SD = sd (R5_regout), SE = sd(R5_regout)/sqrt(length(R5_regout)), N = length(R5_regout)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_fixationrate, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_fixationrate + SE, ymin = M_pretarget_fixationrate - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR5_regout_d<- glmer(R5_regout ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur  + + c_ui + c_ur || sub) + (1 + c + ui + ur + c_ui + c_ur || item),family = "binomial", data=data1)),cor=FALSE)
+
+```
+
+### Regin
+
+```{r R5_regin}
+(M<- ddply(data1, .(constrainttype, previewtype), summarise, M_pretarget_fixationrate = mean(R5_regin), SD = sd (R5_regin), SE = sd(R5_regin)/sqrt(length(R5_regin)), N = length(R5_regin)))
+
+qplot(data = M, x = previewtype, y = M_pretarget_fixationrate, group = constrainttype, colour = constrainttype,geom=c("point", "line"))+scale_colour_manual(values=c("blue","red"))+
+  geom_errorbar(aes(ymax = M_pretarget_fixationrate + SE, ymin = M_pretarget_fixationrate - SE), width=.1) +
+  theme_bw()
+
+print(summary(mR5_regin_d<- glmer(R5_regin ~ c + ui + ur + c_ui + c_ur + (1 + c + ui + ur  + + c_ui + c_ur || sub) + (1 + c + ui + ur + c_ui + c_ur || item),family = "binomial", data=data1)),cor=FALSE)
+
+```
+
+
+
+
+
+
