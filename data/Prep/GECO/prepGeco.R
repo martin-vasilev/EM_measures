@@ -65,3 +65,4 @@ geco<- Frequency(geco, database = "SUBTLEX-US")
 
 
 save(geco, file= "data/geco.Rda")
+write.csv(geco, "data/geco.csv")

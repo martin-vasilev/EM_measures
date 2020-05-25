@@ -1,0 +1,57 @@
+###########################################################################
+#
+#   Codebook for the Russian Sentence Corpus data file(s)
+#   Written by Anna Laurinavichyute
+#   email: annlaurin@gmail.com
+#   Please email me if you see any errors or have any questions
+#   last update: 27.11.2019
+#
+###########################################################################
+
+
+item.id: 	sentence id
+word.serial.no: 	the position of the word in the sentence
+word.id: 	unique word from id. The same word form in two different sentences will have the same word.id
+DATA_FILE: 	subject id
+IA_DWELL_TIME: total reading time
+IA_FIRST_FIXATION_DURATION: durtion of any first fixation on the word (single fixations included!)
+IA_FIRST_RUN_DWELL_TIME: first-pass reading time
+IA_LEGAL: 	level 0 - previous region was not fixated
+IA_SKIP: 	0 - region fixated, 1 - skipped
+IA_REGRESSION_OUT: 	level 0 - not an origin of a regressive saccade
+IA_REGRESSION_IN: 	level 0 - not a goal of a regressive saccade
+landing: 	x coordinate of the saccade landing position, where 0 is the beginning of the word (i.e. the position can be negative)
+dir: 		direction of the outgoing saccade, level 1 - forward, 2 - backward 
+wl_comma: 	word length in characters including commas appended to words
+fixated.letter: number of the letter on which first fixation landed
+one_fix: 	1 if the word was fixated once, 0 otherwise
+twoplus_fix: 1 if the word was fixated two or more times, 0 otherwise
+item.text: 	sentence text
+Lemma:		self-explanatory	
+POS:		part of speech: V(erb), A(djective), ADV(erb), PR(epositions & conjunctions), NUM(eral), S(counterintuitively, noun)
+fl: 		1 if the word is the first or the last in the sentence
+average.accuracy: predictability on % scale
+initial.bigram:	self-explanatory	
+initial.trigram:	self-explanatory	
+freq:		log10 frequency of the word
+fam_bi:		familiarity of the 1st bigram (sum of the lexical frequencies of all word forms sharing initial 2 letters with the current word)
+fam_tri:	familiarity of the 1st triram (sum of the lexical frequencies of all word forms sharing initial 3 letters with the current word)
+inf_bi:		informativeness of the 1st bigram (number of different words of the same length consistent with the initial 2 letters of the current word )
+inf_tri:	informativeness of the 1st trigram (number of different words of the same length consistent with the initial 3 letters of the current word)
+base.form: 	level 0 - non-base, 1 - base
+ambig: 		level 0 - unambiguous morphological form of the word
+logit.acc:	logit-transformed predictability of the word given previous part of the sentence 
+comma.present: 	level 0 - comma absent, 1 - present
+sentence.length: sentence length in words 
+target.word:	1 is the word is a target word (a group of words with orthogonally manipulated length and frequency, see our paper)
+logfreq: 	log10 word frequency
+wl_nocomma: word length excluding commas appended to words
+len.scaled: scaled and centered word length in letters
+ao: 		amplitude of the first saccade landing in the current region (in letters)
+next.fam.bi:	sum of the lexical frequencies of all word forms sharing initial 2 letters with the n+1 word 
+next.fam.tri:	sum of the lexical frequencies of all word forms sharing initial 3 letters with the n+1 word 
+next.inf.bi:	number of different words of the same length consistent with the initial 2 letters of the n+1 word  
+next.inf.tri:	number of different words of the same length consistent with the initial 3 letters of the n+1 word 
+next.len.scaled: n+1 scaled and centered word length in letters
+next.logfreq:	n+1 log10 word frequency
+next.logit.acc:	n+1 logit predictability score

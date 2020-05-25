@@ -3,7 +3,22 @@
 
 rm(list= ls())
 
-load("data/Provo/OSFdata.Rda")
+# load/ install preprocssing package:
+if('EMreading' %in% rownames(installed.packages())==FALSE){
+  if('devtools' %in% rownames(installed.packages())==FALSE){
+    install.packages('devtools')
+    library(devtools)
+  }else{
+    library(devtools)
+  }
+  install_github('martin-vasilev/EMreading')
+}else{
+  library(EMreading)
+}
+
+
+
+load("data/Prep/Provo/OSFdata.Rda")
 
 # let's get of some unnecessary columns:
 dat$RECORDING_SESSION_LABEL<- NULL
@@ -91,4 +106,9 @@ dat<- dat[, c("sub", "item", "seq",  "word", "sent", "word_sent", "wordID", "wor
                "FFD", "GD", "SFD", "TVT", "GPT", "skip", "nfix1", "cloze","cloze_model",
                "POS_CLAWS", "word_type", "Word_POS", "unique_ID")]
 
-save(dat, file= "data/Provo.Rda")
+## Add frequency:
+Provo<- Frequency(Provo, database = "SUBTLEX-US")
+
+
+save(Provo, file= "data/Provo.Rda")
+write.csv(Provo, "Data/Provo.csv")
