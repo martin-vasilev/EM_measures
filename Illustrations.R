@@ -40,7 +40,7 @@ dat_arrows <- dat %>%
   ) %>%
   filter(!is.na(xend))
 
-dat_arrows$is_back<- ifelse(dat_arrows$is_back== TRUE, "Yes", "No")
+dat_arrows$is_back<- ifelse(dat_arrows$is_back== TRUE, "Regressive", "Progressive")
 
 
 dat_arrows$xend[which(dat_arrows$is_back== TRUE)]<- dat_arrows$xend[which(dat_arrows$is_back== TRUE)]+16
@@ -72,7 +72,7 @@ P1<- samples %>% ggplot(aes(x= xPos, y = yPos))+
               shape = 21, fill = "blue", color = "black", alpha= 0.33)+
   scale_size(range = c(0, 14))+
   geom_text(data= dat, aes(x= xPos, y=yPos -20, label= as.character(fix_num)))+
-  labs(size= 'Fixation duration (ms)', linetype = "Regression")+
+  labs(size= 'Fixation duration (ms)', linetype = "Type of saccade")+
   geom_curve(data = dat_arrows,
                             aes(x = xPos, y = ystart, xend = xend, yend = yend,
                                 linetype = is_back),
@@ -80,11 +80,24 @@ P1<- samples %>% ggplot(aes(x= xPos, y = yPos))+
                             arrow = arrow(length = unit(0.05, "inches"),
                                           type = "closed"),
                             curvature = -0.4,
-                            alpha = 0.5)
+                            alpha = 0.65)+
   
   # add some annotation labels:
-
+  # skip:
+  annotate("text", x = 445, y = 520, label = "skip",color= 'lightgreen')+
   
+  # regression:
+  annotate("text", x = 690, y = 543, label = "regression",color= 'lightgreen', angle= 15)+
+  
+  # refixation:
+  annotate("text", x = 390, y = 535, label = "refixation",color= 'lightgreen')+
+  
+  # return-sweep:
+  annotate("text", x = 655, y = 580, label = "return-sweep",color= 'lightgreen',angle = 50)+
+  
+  # undersweep:
+  annotate("text", x = 275, y = 628, label = "undersweep",color= 'lightgreen')
+
   # geom_segment(data = dat_arrows,
   #              aes(x = xPos, y = ystart, xend = xend, yend = yend,
   #                  linetype = is_back,
