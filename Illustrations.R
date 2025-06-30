@@ -32,13 +32,18 @@ library(ggplot2)
 dat_arrows <- dat %>%
   #arrange(fix_num) %>%
   mutate(
-    xend = lead(xPos),
+    xend = lead(xPos-8),
     yend = lead(yPos - 20),
     ystart = yPos - 20,
     next_fix = lead(word),
     is_back = next_fix < word
   ) %>%
   filter(!is.na(xend))
+
+dat_arrows$is_back<- ifelse(dat_arrows$is_back== TRUE, "Yes", "No")
+
+
+dat_arrows$xend[which(dat_arrows$is_back== TRUE)]<- dat_arrows$xend[which(dat_arrows$is_back== TRUE)]+16
 
 P1<- samples %>% ggplot(aes(x= xPos, y = yPos))+
   #ylim(500, 700)+
@@ -67,15 +72,18 @@ P1<- samples %>% ggplot(aes(x= xPos, y = yPos))+
               shape = 21, fill = "blue", color = "black", alpha= 0.33)+
   scale_size(range = c(0, 14))+
   geom_text(data= dat, aes(x= xPos, y=yPos -20, label= as.character(fix_num)))+
-  labs(size= 'Fixation duration')+
+  labs(size= 'Fixation duration (ms)', linetype = "Regression")+
   geom_curve(data = dat_arrows,
                             aes(x = xPos, y = ystart, xend = xend, yend = yend,
-                                linetype = is_back,
-                                color = is_back),
-                            arrow = arrow(length = unit(0.08, "inches"),
+                                linetype = is_back),
+                            color = '#67666B',
+                            arrow = arrow(length = unit(0.05, "inches"),
                                           type = "closed"),
                             curvature = -0.4,
                             alpha = 0.5)
+  
+  # add some annotation labels:
+
   
   # geom_segment(data = dat_arrows,
   #              aes(x = xPos, y = ystart, xend = xend, yend = yend,
@@ -84,7 +92,8 @@ P1<- samples %>% ggplot(aes(x= xPos, y = yPos))+
   #              arrow = arrow(length = unit(0.08, "inches"), type = "closed"),
   #              alpha = 0.5) +
   # scale_linetype_manual(values = c("Forward" = "solid", "Backward" = "dotted")) +
- # scale_color_manual(values = c("Forward" = "black", "Backward" = "red")) +
+  # scale_color_manual(values = c("FALSE" = "black", "TRUE" = "purple",
+  #                               "Eye trace" = "#E4080A") )
  # guides(linetype = "none")  # hides linetype legend, optional
 
 ggsave(plot = P1, filename = 'Plots/Trial_visualisation.pdf', width = 10.5, 
