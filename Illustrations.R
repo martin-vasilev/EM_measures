@@ -135,8 +135,9 @@ ke<- s_L1[,c('xPos', 'yPos', 'item', 'time_ms')]
 
 colnames(ke)<- c("x", "y", "trial", "time")
 
-ke.result<- detect.fixations(ke, lambda = 15, smooth.coordinates = FALSE,
+ke.result<- detect.fixations(ke, lambda = 12, smooth.coordinates = FALSE,
                      smooth.saccades = TRUE)
+ke.result<- subset(ke.result, event=='fixation')
 
 PA1<- s_L1 %>%
   ggplot(aes(x= time_ms, y= xPos))+
@@ -171,7 +172,7 @@ PA2<- s_L1 %>%
             inherit.aes = FALSE)+
   geom_line()+
   
-  ggtitle(expression("Engbert & Kliegl (2003) saccade detection algorithm ("*lambda*" = 15)"))+
+  ggtitle(expression("Engbert & Kliegl (2003) saccade detection algorithm ("*lambda*" = 12)"))+
   theme(plot.title = element_text(hjust = 0.5))
   
 library(ggpubr)
@@ -295,7 +296,7 @@ l14 <- read_csv("data/saccadic_algorithms/Text_font_EK2003_l14.csv")
 l15 <- read_csv("data/saccadic_algorithms/Text_font_EK2003_l15.csv")
 
 ek<- rbind(l6, l7, l8, l9, l10, l11, l12, l13, l14, l15)
-rm(l6, l7, l8, l9, l10, l11, l12, l13, l14)
+#rm(l6, l7, l8, l9, l10, l11, l12, l13, l14)
 
 #ek<- subset(ek, event== "fixation")
 
@@ -311,17 +312,17 @@ mean(el.sum$M)
 
 el<-raw_fix[, c('sub', 'item', 'fix_dur')]
 
-l15<- subset(l15, event== "fixation")
-ek_l15<- l15[, c('sub', 'trial', 'dur')]
+l12<- subset(l12, event== "fixation")
+ek_l12<- l12[, c('sub', 'trial', 'dur')]
 
-colnames(ek_l15)<- c('sub', 'item', 'fix_dur')
+colnames(ek_l12)<- c('sub', 'item', 'fix_dur')
 
 
 
 el$Algorithm<- "Eyelink (default)"
-ek_l15$Algorithm <- "Engbert and Kliegl (2003)"#
+ek_l12$Algorithm <- "Engbert and Kliegl (2003)"#
 
-dat<- rbind(el, ek_l15)
+dat<- rbind(el, ek_l12)
 
 
 SA1<-dat %>%
@@ -331,10 +332,10 @@ SA1<-dat %>%
   scale_fill_manual(
     values = c("Engbert and Kliegl (2003)" = pallete1[1],  
                "Eyelink (default)" = pallete1[2]),         
-    labels = c(expression("Engbert and Kliegl, 2003 ("*lambda*" = 15)"),
-               "Eyelink (default)")
+    labels = c(expression("E & K (2003), "*lambda*" = 12"),
+               "Eyelink")
   ) +
-  theme_bw(base_size = 16) +
+  theme_bw(18) +
   labs(x = 'Fixation duration (in ms)', y = 'Density')+
   theme(legend.position = 'inside', legend.position.inside = c(0.6, 0.8))+
   ggtitle('a)')
@@ -354,16 +355,16 @@ r2 <- summary(model)$r.squared
 SA2<- dat2 %>%
   ggplot(aes(x= `Engbert and Kliegl (2003)`, y= `Eyelink (default)`))+
   geom_point(color= pallete1[3], size=2)+
-  theme_bw(base_size = 16)+
-  labs(x= expression("Fixation duration (Engbert and Kliegl, 2003, "*lambda*" = 15)"),
-                     y= "Fixation duration (Eyelink default)")+
+  theme_bw(base_size = 18)+
+  labs(x = expression("Fixation duration (E & K, 2003, "*lambda*" = 12)"),
+                     y= "Fixation duration (Eyelink)")+
   geom_smooth(method = 'lm', color= pallete1[1])+
   annotate(
     "text",
     x = Inf, y = -Inf,
     hjust = 1.1, vjust = -0.5,
     label = paste0("R² = ", round(r2, 3)),
-    size = 5
+    size = 7
   )+
   ggtitle('b)')
 
@@ -379,7 +380,7 @@ SA3<- dat%>%
   summarise(M= mean(n))%>%
   
   ggplot(aes(x= Algorithm, y= M, fill = Algorithm, color= Algorithm))+
-  theme_bw(16)+
+  theme_bw(18)+
   ggdist::stat_halfeye(
     adjust = .5, 
     width = .6, 
@@ -405,13 +406,13 @@ SA3<- dat%>%
                "Eyelink (default)" = pallete1[2]))+
   scale_x_discrete(
     labels = c(
-      "Engbert and Kliegl (2003)" = expression("Engbert and Kliegl, 2003 ("*lambda*" = 15)"),
-      "Eyelink (default)" = "Eyelink (default)"
+      "Engbert and Kliegl (2003)" = expression("E & K (2003), "*lambda*" = 15"),
+      "Eyelink (default)" = "Eyelink"
     )
   )+
   labs(y= "Mean number of fixations (per trial)")+
   theme(legend.position = 'none')+
-  stat_summary(fun = mean, geom="point",colour="black", size=3) +
+  stat_summary(fun = mean, geom="point",colour="black", size=2) +
   stat_summary(fun.data = fun_mean, geom="text", vjust=-1.15,
                hjust= 0.75, colour="black", size= 7)+
   ggtitle('c)')
@@ -422,5 +423,59 @@ library(ggpubr)
 figureSA <- ggarrange(SA1, SA2, SA3, ncol = 3)
 
 # Save using ggsave() – this should work if figureSA is a ggpubr object
-ggsave("Plots/ELvsEK.pdf", plot = figureSA, width = 18, height = 8)
+ggsave("Plots/ELvsEK.pdf", plot = figureSA, width = 15, height = 8)
+
+
+
+#### comparisons showing the effect if lambda:
+
+l_means<- ek %>% 
+  filter(event== "fixation")%>%
+  group_by(lambda, sub)%>%
+  summarise(M= mean(dur, na.rm= T))
+
+l_means<- l_means[,c('sub', 'M', 'lambda')]
+
+el.sum2<- do.call("rbind", replicate(10, el.sum, simplify = FALSE))
+el.sum2$lambda<- rep(6:15, each= 64)
+
+el.sum2$Algorithm<- "Eyelink"
+l_means$Algorithm <- "EK03"#
+
+sub_data<- rbind(l_means, el.sum2)
+
+# Calculate R² for each lambda
+r2_df <- sub_data %>%
+  pivot_wider(names_from = 'Algorithm', values_from = 'M') %>%
+  group_by(lambda) %>%
+  do({
+    mod <- lm(Eyelink ~ EK03, data = .)
+    tibble(r2 = summary(mod)$r.squared)
+  }) %>%
+  mutate(
+    label = paste0("R² = ", round(r2, 3)),
+    x = max(sub_data$M[sub_data$Algorithm == "EK03"], na.rm = TRUE),
+    y = max(sub_data$M[sub_data$Algorithm == "Eyelink"], na.rm = TRUE)
+  )
+
+# Plot with annotations
+lambda_p<-sub_data %>%
+  pivot_wider(names_from = 'Algorithm', values_from = 'M') %>%
+  ggplot(aes(x = EK03, y = Eyelink)) +
+  geom_point(color = pallete1[3], size = 2) +
+  geom_smooth(method = 'lm', color = pallete1[1]) +
+  theme_bw(base_size = 18) +
+  labs(
+    x = "Fixation duration (Engbert & Kliegl, 2003)",
+    y = "Fixation duration (Eyelink)"
+  ) +
+  facet_wrap(~lambda, ncol=2, labeller = labeller(lambda = function(x) paste0("λ = ", x))) +
+  geom_text(
+    data = r2_df,
+    aes(x = x, y = y, label = label),
+    inherit.aes = FALSE,
+    hjust = 1, vjust = 1
+  )
+
+ggsave(filename = 'Plots/ELvsEK_lambda.png', plot = lambda_p,width = 8, height= 10)
 
