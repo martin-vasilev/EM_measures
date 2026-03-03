@@ -25,5 +25,9 @@ OZ<- OZ[-which(OZ$blinks_1stPass==1 | OZ$blinks_2ndPass==1),]
 OZ$blinks_1stPass<- NULL
 OZ$blinks_2ndPass<- NULL
 
+OZ$wordID<- gsub("#####", "", OZ$wordID)
+OZ$word_length<- nchar(as.character(OZ$wordID))
+OZ<- Frequency(OZ)
+
 
 save(OZ, file= "data/OZ.Rda")

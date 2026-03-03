@@ -55,7 +55,7 @@ dat$IA_FIRST_SACCADE_ANGLE<- NULL
 dat$IA_FIRST_SACCADE_AMPLITUDE<- NULL
 dat$IA_FIRST_SACCADE_END_TIME<- NULL
 dat$IA_FIRST_SACCADE_START_TIME<- NULL
-dat$IA_FIXATION_COUNT<- NULL
+#dat$IA_FIXATION_COUNT<- NULL
 dat$IA_REGRESSION_IN<- NULL
 dat$IA_REGRESSION_IN_COUNT<- NULL
 dat$IA_RUN_COUNT<- NULL
@@ -69,9 +69,11 @@ dat$IA_REGRESSION_OUT_FULL_COUNT<- NULL
 colnames(dat)<- c("sub", "unique_ID", "item", "word", "sent", "word_sent", "wordID", "word_length",                
                   "cloze", "cloze_model", "Certainty", "POS_CLAWS", "word_type", "Word_POS", "seq",
                   "FFD", 
-                  "GD", "nfix1", "TVT", "skip", "GPT")
+                  "GD", "nfix1", "TVT", 'nfixAll', "skip", "GPT")
 
 dat$Certainty<- NULL
+
+dat$nfix2<- dat$nfixAll - dat$nfix1
 
 # calculate SFD:
 dat$SFD<- NULL

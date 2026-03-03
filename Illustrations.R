@@ -406,7 +406,7 @@ SA3<- dat%>%
                "Eyelink (default)" = pallete1[2]))+
   scale_x_discrete(
     labels = c(
-      "Engbert and Kliegl (2003)" = expression("E & K (2003), "*lambda*" = 15"),
+      "Engbert and Kliegl (2003)" = expression("E & K (2003), "*lambda*" = 12"),
       "Eyelink (default)" = "Eyelink"
     )
   )+
@@ -464,7 +464,7 @@ lambda_p<-sub_data %>%
   ggplot(aes(x = EK03, y = Eyelink)) +
   geom_point(color = pallete1[3], size = 2) +
   geom_smooth(method = 'lm', color = pallete1[1]) +
-  theme_bw(base_size = 18) +
+  theme_bw(base_size = 20) +
   labs(
     x = "Fixation duration (Engbert & Kliegl, 2003)",
     y = "Fixation duration (Eyelink)"
@@ -474,8 +474,31 @@ lambda_p<-sub_data %>%
     data = r2_df,
     aes(x = x, y = y, label = label),
     inherit.aes = FALSE,
-    hjust = 1, vjust = 1
+    hjust = 1, vjust = 1, size=6
   )
 
-ggsave(filename = 'Plots/ELvsEK_lambda.png', plot = lambda_p,width = 8, height= 10)
+ggsave(filename = 'Plots/ELvsEK_lambda.png', plot = lambda_p,width = 8, height= 14)
+
+
+###### Show number of papers publishing EM studies per year:
+
+pubmed <- read.csv("~/R/EM_measures/data/PubMed_Timeline_Results_by_Year.csv")
+
+library(tidyverse)
+Stats_P <- pubmed %>%  ggplot(aes(x=Year, y= Count))+
+  geom_bar(stat = 'identity', fill= "steelblue4")+
+  theme_minimal(20)+
+  labs(y= 'Number of published papers\n')
+
+Stats_P
+
+ggsave(filename = 'Plots/Stats_Plot.png', plot = Stats_P, width= 8, 
+       height = 6)
+
+
+
+### Plot showing classification of eye-movements during reading:
+rm(list= ls())
+
+load("~/R/EM_measures/data/Prep/Provo/OSFdata.Rda")
 
