@@ -31,7 +31,7 @@ P1<-r_corr%>%ggcorrplot(method = 'square', type = 'upper',
         legend.title = element_text(size = 14))
 
 
-Provo_c<- Provo[,c(9, 11, 10,13, 12)]
+Provo_c<- Provo[,c('FFD', 'SFD', 'GD', 'GPT', 'TVT')]
 colnames(Provo_c)<- c("FFD", "SFD", "GD", "GPT", "TFT" )
 
 r_corr2<- cor(Provo_c, use = 'pairwise.complete.obs', method = 'pearson')
@@ -146,7 +146,7 @@ pRF1<- Provo %>%
   geom_line(color= pallete1[1])+
   ylim(0, 1)+
   geom_ribbon(fill= pallete1[1], alpha= .2)+
-  labs(x= "Word length (in characters)",
+  labs(x= "Word length\n(in characters)",
        y= "First-pass refixation probability")+
   theme_classic(20)+
   scale_x_continuous(breaks = scales::pretty_breaks(n = 6))
@@ -164,7 +164,7 @@ RF2<- Provo %>%
   geom_line(color= pallete1[2])+
   ylim(0, 1)+
   geom_ribbon(fill= pallete1[2], alpha= .2)+
-  labs(x= "Word frequency (Zipf)",
+  labs(x= "Word frequency (Zipf)\n",
        y= "First-pass refixation probability")+
   theme_classic(20)+
   scale_x_continuous(breaks = scales::pretty_breaks(n = 6))
@@ -182,17 +182,37 @@ RF3<- Provo %>%
   geom_line(color= pallete1[3])+
   ylim(0, 1)+
   geom_ribbon(fill= pallete1[3], alpha= .2)+
-  labs(x= "Word predictability",
+  labs(x= "Word predictability\n",
+       y= "First-pass refixation probability")+
+  theme_classic(20)+
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6))
+
+# by landing position:
+RF4<- Provo %>% 
+  mutate(land_c= land_pos - (word_length/2))%>%
+  filter(abs(land_c)< 6)%>%
+  group_by(land_c) %>%
+  summarise(M= mean(refix_1st, na.rm = T), 
+            SD= sd(refix_1st, na.rm = T),
+            N= length(unique(sub)))%>%
+  mutate(SE= SD/sqrt(N),
+  upper= M+ SE, lower= M-SE)%>%
+  ggplot(aes(x= land_c, y = M, ymin= lower, ymax= upper))+
+  geom_line(color= pallete1[5])+
+  ylim(0, 1)+
+  geom_ribbon(fill= pallete1[5], alpha= .2)+
+  labs(x= "Landing position\n(relative to word centre)",
        y= "First-pass refixation probability")+
   theme_classic(20)+
   scale_x_continuous(breaks = scales::pretty_breaks(n = 6))
 
 
 
+
 library(ggpubr)
 
 # Combine
-figureRF <- ggarrange(pRF1, RF2, RF3, ncol = 3)
+figureRF <- ggarrange(pRF1, RF2, RF3, RF4, ncol = 4)
 
 # Save using ggsave() – this should work if figureSA is a ggpubr object
 ggsave("Plots/refixation_prob.pdf", 
@@ -270,7 +290,117 @@ figureRF_final <- ggarrange(figureRF_titled,
                             Refix_dur_titled, nrow=2) 
 
 ggsave("Plots/refixation_prob_combined.pdf", 
-       plot = figureRF_final, width = 14, height = 14)
+       plot = figureRF_final, width = 16, height = 14)
+
+
+
+### Second-pass refixation probability
+
+geco$refix_2nd<- ifelse(geco$TVT> geco$GD, 1, 0)
+Provo$refix_2nd<- ifelse(Provo$TVT> Provo$GD, 1, 0)
+textFont$refix_2nd<- ifelse(textFont$TVT> textFont$GD, 1, 0)
+Oz$refix_2nd<- ifelse(Oz$TVT> Oz$GD, 1, 0)
+
+
+# GECO
+round(mean(geco$refix_2nd, na.rm=T),2)
+round(sd(geco$refix_2nd, na.rm=T),2)
+
+# Provo:
+round(mean(Provo$refix_2nd, na.rm=T),2)
+round(sd(Provo$refix_2nd, na.rm=T),2)
+
+# Text font:
+round(mean(textFont$refix_2nd, na.rm=T),2)
+round(sd(textFont$refix_2nd, na.rm=T),2)
+
+# Oz:
+round(mean(Oz$refix_2nd, na.rm=T),2)
+round(sd(Oz$refix_2nd, na.rm=T),2)
+
+
+RF_2nd<- Provo %>% 
+  group_by(word_length) %>%
+  summarise(M= mean(refix_2nd, na.rm = T), 
+            SD= sd(refix_2nd, na.rm = T),
+            N= length(unique(sub)))%>%
+  mutate(SE= SD/sqrt(N),
+         upper= M+ SE, lower= M-SE)%>%
+  ggplot(aes(x= word_length, y = M, ymin= lower, ymax= upper))+
+  geom_line(color= pallete1[1])+
+  ylim(0, 1)+
+  geom_ribbon(fill= pallete1[1], alpha= .2)+
+  labs(x= "Word length\n(in characters)",
+       y= "Second-pass refixation probability")+
+  theme_classic(20)+
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6))
+
+
+RF_2nd_F<- Provo %>% 
+  mutate(zipf_r= round(zipf,1))%>%
+  group_by(zipf_r) %>%
+  summarise(M= mean(refix_2nd, na.rm = T), 
+            SD= sd(refix_2nd, na.rm = T),
+            N= length(unique(sub)))%>%
+  mutate(SE= SD/sqrt(N),
+         upper= M+ SE, lower= M-SE)%>%
+  ggplot(aes(x= zipf_r, y = M, ymin= lower, ymax= upper))+
+  geom_line(color= pallete1[2])+
+  ylim(0, 1)+
+  geom_ribbon(fill= pallete1[2], alpha= .2)+
+  labs(x= "Word frequency (Zipf)\n",
+       y= "Second-pass refixation probability")+
+  theme_classic(20)+
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6))
+
+
+RF_2nd_C<- Provo %>% 
+  mutate(cloze_model= round(cloze_model,1))%>%
+  group_by(cloze_model) %>%
+  summarise(M= mean(refix_2nd, na.rm = T), 
+            SD= sd(refix_2nd, na.rm = T),
+            N= length(unique(sub)))%>%
+  mutate(SE= SD/sqrt(N),
+         upper= M+ SE, lower= M-SE)%>%
+  ggplot(aes(x= cloze_model, y = M, ymin= lower, ymax= upper))+
+  geom_line(color= pallete1[3])+
+  ylim(0, 1)+
+  geom_ribbon(fill= pallete1[3], alpha= .2)+
+  labs(x= "Word predictability (Zipf)\n",
+       y= "Second-pass refixation probability")+
+  theme_classic(20)+
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6))
+
+
+
+RF_2nd_L<- Provo %>% 
+  mutate(land_c= land_pos - (word_length/2))%>%
+  filter(abs(land_c)< 6)%>%
+  group_by(land_c) %>%
+  summarise(M= mean(refix_2nd, na.rm = T), 
+            SD= sd(refix_2nd, na.rm = T),
+            N= length(unique(sub)))%>%
+  mutate(SE= SD/sqrt(N),
+         upper= M+ SE, lower= M-SE)%>%
+  ggplot(aes(x= land_c, y = M, ymin= lower, ymax= upper))+
+  geom_line(color= pallete1[5])+
+  ylim(0, 1)+
+  geom_ribbon(fill= pallete1[5], alpha= .2)+
+  labs(x= "Initial landing position\n(relative to word centre)",
+       y= "Second-pass refixation probability")+
+  theme_classic(20)+
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 6))
+
+library(ggpubr)
+
+# Combine
+figureRF_2nd <- ggarrange(RF_2nd, RF_2nd_F, RF_2nd_C,
+                          RF_2nd_L, ncol = 4, align = "v")
+
+# Save using ggsave() – this should work if figureSA is a ggpubr object
+ggsave("Plots/refixation_prob_2nd.pdf", 
+       plot = figureRF_2nd, width = 16, height = 8)
+
 
 
 ### Show differences between FFD distributions (single vs refixated):
@@ -282,6 +412,7 @@ geco %>%
              colour=refix_1st, group= refix_1st))+
   geom_density(alpha=.2)+
   theme_bw(18)
+
 
 # geco %>% group_by(refix_1st)%>%
 #   summarise (M= mean(FFD, na.rm=T))
@@ -630,7 +761,7 @@ fixation_comps<- ggplot(dat_long_time, aes(x = corpus, y = Time, fill = Componen
   geom_col(width = 0.7) +
   labs(
     x = "Corpus",
-    y = "Mean Total Fixation Duration per word",
+    y = "Mean total fixation\nduration per word",
     fill = "Reading time component",
     title= 'a)'
   ) +
@@ -647,7 +778,7 @@ fixation_comps<- ggplot(dat_long_time, aes(x = corpus, y = Time, fill = Componen
     )
   ) +
   theme_bw(24)+
-  theme(legend.position = 'bottom',
+  theme(legend.position = 'right',
         legend.direction = "vertical")
 
 refix_time<- dat_all%>% filter(Refix_time>0)
@@ -670,9 +801,9 @@ Refix_length<- dat_all%>%
 #  ylim(0, 160)+
   labs(
     x = "Word length (char.)",
-    y = 'Refixation duration (GD - FFD) in ms'
+    y = 'Refixation duration\n(GD - FFD)'
   )+
-  ggtitle('b)')+
+  ggtitle('c)')+
   theme(legend.position = 'bottom')
   
 
@@ -700,21 +831,26 @@ figure_Refixdur <- ggarrange(Refix_length,
 plot_dat<- dat_all%>% 
   group_by(corpus,sub)%>%
   summarise(FFD= mean(FFD, na.rm=T),
-            Refix_time= mean(Refix_time, na.rm=T))
+            Refix_time= mean(Refix_time, na.rm=T),
+            GD= mean(GD, na.rm=T),
+            Regression_time= mean(Regression_time, na.rm=T))
 
 r2_dat <- plot_dat %>%
-  group_by(corpus) %>%
+  ungroup()%>%
+ # group_by(corpus) %>%
   summarise(
-    r2 = summary(lm(Refix_time ~ FFD))$r.squared,
-    .groups = "drop"
+    r2 = summary(lm(Refix_time ~ FFD))$r.squared
   )%>%
   mutate(label = paste0("R² = ", round(r2, 2)))
 
 Refix_scatter<- plot_dat%>%
-  ggplot(aes(x= FFD, y= Refix_time))+
-  geom_point()+
-  facet_wrap(~corpus)+
-  geom_smooth(method= 'lm')+
+  ggplot(aes(x= FFD, y= Refix_time, colour= corpus))+
+  geom_point(size=2)+
+  geom_smooth(method = "lm", aes(group = 1), colour = "black")+
+  scale_colour_manual(values = pallete1[c(1,3,5,6)])+
+  scale_fill_manual(values = pallete1[c(1,3,5,6)])+
+  #facet_wrap(~corpus)+
+  #geom_smooth(method= 'lm')+
   geom_text(
     data = r2_dat,
     aes(x = Inf,
@@ -725,24 +861,63 @@ Refix_scatter<- plot_dat%>%
     inherit.aes = FALSE,
     size = 8
   ) +
-  ggtitle('c)')+
-  labs(x= 'FFD', y= "Refixation duration (GD - FFD)")+
-  theme_bw(24)
+  ggtitle('b)')+
+  labs(x= 'FFD', y= "Refixation duration\n(GD - FFD)")+
+  theme_bw(24)+
+  theme(legend.position= "bottom")
+
+r2_dat_reg <- plot_dat %>%
+  ungroup()%>%
+  # group_by(corpus) %>%
+  summarise(
+    r2 = summary(lm(Regression_time ~ GD))$r.squared
+  )%>%
+  mutate(label = paste0("R² = ", round(r2, 2)))
+
+Refix_scatter2<- plot_dat%>%
+  ggplot(aes(x= GD, y= Regression_time, colour= corpus))+
+  geom_point(size=2)+
+  geom_smooth(method = "lm", aes(group = 1), colour = "black")+
+  scale_colour_manual(values = pallete1[c(1,3,5,6)])+
+  scale_fill_manual(values = pallete1[c(1,3,5,6)])+
+  #facet_wrap(~corpus)+
+  #geom_smooth(method= 'lm')+
+  geom_text(
+    data = r2_dat_reg,
+    aes(x = Inf,
+        y = Inf,
+        label = label),
+    hjust = 1.1,
+    vjust = 1.2,
+    inherit.aes = FALSE,
+    size = 8
+  ) +
+  ggtitle('')+
+  labs(x= 'GD', y= "Regression duration\n(TFD - GD)")+
+  theme_bw(24)+
+  theme(legend.position= "bottom")
+
 
 figure_GD <- ggarrange(fixation_comps,
                        figure_Refixdur,
                        nrow=1, widths = c(0.6, 1)) 
 
-figure_GD2 <- ggarrange(figure_GD,
-                        Refix_scatter,
-                       nrow=2, widths = c(2, 1)) 
+scatter_panel <- ggarrange(Refix_scatter,Refix_scatter2,
+                       nrow=1, common.legend = T,
+                       legend = 'bottom') 
 
-ggsave("Plots/GD_combined.pdf", 
-       plot = figure_GD2, width = 16, height = 18)
+
+
+
+# figure_GD2 <- ggarrange(figure_GD,
+#                         scatter_panel,
+#                        nrow=2, widths = c(1, 1)) 
+# 
+# ggsave("Plots/GD_combined.pdf", 
+#        plot = figure_GD2, width = 16, height = 18)
 
 
 #### Regression time (TVT):
-
 
 Regress_length<- dat_all%>% 
   mutate(length_capped = pmin(word_length, 15)) %>%
@@ -755,13 +930,13 @@ Regress_length<- dat_all%>%
     breaks = seq(1, 15, 2),
     labels = c(as.character(seq(1, 14, 2)), "15+")
   )+
-#  coord_cartesian(ylim = ylims)+
+ coord_cartesian(ylim = ylims)+
   #  ylim(0, 160)+
   labs(
     x = "Word length (char.)",
-    y = 'Regression duration (TVT - GD) in ms'
+    y = 'Regression duration\n(TVT - GD)'
   )+
-  ggtitle('b)')+
+  ggtitle('d)')+
   theme(legend.position = 'bottom')
 
 
@@ -781,10 +956,29 @@ Regress_freq<- dat_all%>%
   ggtitle('')+
   theme(legend.position = 'bottom')
 
-figure_Refixdur <- ggarrange(Refix_length,
-                             Refix_freq, nrow=1, 
+figure_Refixdur2 <- ggarrange(Regress_length,
+                             Regress_freq, nrow=1, 
                              common.legend = T,
                              legend = 'bottom') 
+
+figure_GD2<- ggarrange(fixation_comps,
+                       scatter_panel,
+                       figure_Refixdur,
+                       figure_Refixdur2,
+                       ncol=1)
+                      # common.legend = T,
+                      # legend = 'bottom') 
+
+
+ggsave("Plots/GD_combined.pdf", 
+       plot = figure_GD2, width = 15, height = 24)
+
+# TFD------- How many 2nd-pass re-fixations do words receive?
+
+dat_all<- dat_all%>%
+      mutate(nfix2= nfixAll - nfix1)
+
+
 
 
 

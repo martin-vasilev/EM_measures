@@ -36,14 +36,14 @@ dat$LSA_Context_Score<- NULL
 dat$LSA_Response_Match_Score<- NULL
 dat$IA_ID<- NULL
 dat$IA_LABEL<- NULL
-dat$IA_LEFT<- NULL
+#dat$IA_LEFT<- NULL
 dat$IA_AREA<- NULL
-dat$IA_RIGHT<- NULL
+#dat$IA_RIGHT<- NULL
 dat$IA_TOP<- NULL
 dat$IA_BOTTOM<- NULL
 dat$IA_FIRST_FIXATION_INDEX<- NULL
 dat$IA_FIRST_FIXATION_VISITED_IA_COUNT<- NULL
-dat$IA_FIRST_FIXATION_X<- NULL
+#dat$IA_FIRST_FIXATION_X<- NULL
 dat$IA_FIRST_FIXATION_Y<- NULL
 dat$IA_FIRST_FIX_PROGRESSIVE<- NULL
 dat$IA_FIRST_FIXATION_TIME<- NULL
@@ -66,17 +66,21 @@ dat$IA_REGRESSION_OUT_FULL_COUNT<- NULL
 #dat$Word_Unique_ID<- NULL
 
 
-colnames(dat)<- c("sub", "unique_ID", "item", "word", "sent", "word_sent", "wordID", "word_length",                
-                  "cloze", "cloze_model", "Certainty", "POS_CLAWS", "word_type", "Word_POS", "seq",
-                  "FFD", 
+colnames(dat)<- c("sub", "unique_ID", "item", "word", "sent",
+                  "word_sent", "wordID", "word_length",                
+                  "cloze", "cloze_model", "Certainty", 
+                  "POS_CLAWS", "word_type", "Word_POS", "seq",
+                  "IA_LEFT", "IA_RIGHT", "FFD", "land_x", 
                   "GD", "nfix1", "TVT", 'nfixAll', "skip", "GPT")
 
 dat$Certainty<- NULL
 
 dat$nfix2<- dat$nfixAll - dat$nfix1
 
-# calculate SFD:
+# calculate extra stuff:
+dat$land_pos<- NA
 dat$SFD<- NULL
+
 for(i in 1:nrow(dat)){
   
   if(!is.na(dat$FFD[i]) & !is.na(dat$GD[i])){
@@ -90,6 +94,9 @@ for(i in 1:nrow(dat)){
     dat$SFD[i]<- NA
   }
   
+  # landing position:
+  ppl= (dat$IA_RIGHT[i] - dat$IA_LEFT[i])/ dat$word_length[i] 
+  dat$land_pos[i]<- floor((dat$land_x[i] -dat$IA_LEFT[i])/ppl)+1
 
   # fix 0s in TVT while we're at it..
   if(!is.na(dat$TVT[i])){
@@ -102,12 +109,12 @@ for(i in 1:nrow(dat)){
   print(i)
 }
 
-
+Provo= dat
 colnames(dat)
-dat<- dat[, c("sub", "item", "seq",  "word", "sent", "word_sent", "wordID", "word_length",
-               "FFD", "GD", "SFD", "TVT", "GPT", "skip", "nfix1", "cloze","cloze_model",
-               "POS_CLAWS", "word_type", "Word_POS", "unique_ID")]
-
+# dat<- dat[, c("sub", "item", "seq",  "word", "sent", "word_sent", "wordID", "word_length",
+#                "FFD", "GD", "SFD", "TVT", "GPT", "skip", "nfix1", "cloze","cloze_model",
+#                "POS_CLAWS", "word_type", "Word_POS", "unique_ID")]
+# 
 ## Add frequency:
 Provo<- Frequency(Provo, database = "SUBTLEX-US")
 
