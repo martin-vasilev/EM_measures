@@ -45,7 +45,7 @@ dat$IA_FIRST_FIXATION_INDEX<- NULL
 dat$IA_FIRST_FIXATION_VISITED_IA_COUNT<- NULL
 #dat$IA_FIRST_FIXATION_X<- NULL
 dat$IA_FIRST_FIXATION_Y<- NULL
-dat$IA_FIRST_FIX_PROGRESSIVE<- NULL
+#dat$IA_FIRST_FIX_PROGRESSIVE<- NULL
 dat$IA_FIRST_FIXATION_TIME<- NULL
 dat$IA_FIRST_FIXATION_RUN_INDEX<- NULL
 dat$IA_FIRST_RUN_END_TIME<- NULL
@@ -70,11 +70,15 @@ colnames(dat)<- c("sub", "unique_ID", "item", "word", "sent",
                   "word_sent", "wordID", "word_length",                
                   "cloze", "cloze_model", "Certainty", 
                   "POS_CLAWS", "word_type", "Word_POS", "seq",
-                  "IA_LEFT", "IA_RIGHT", "FFD", "land_x", 
+                  "IA_LEFT", "IA_RIGHT", "FFD", "land_x", 'First_fix_progressive', 
                   "GD", "nfix1", "TVT", 'nfixAll', "skip", "GPT")
 
 dat$Certainty<- NULL
 
+## remove cases where first fix progressive is 0 from first-pass measures:
+dat$FFD[which(dat$First_fix_progressive==0)]<- NA
+dat$GD[which(dat$First_fix_progressive==0)]<- NA
+dat$nfix1[which(dat$First_fix_progressive==0)]<- 0
 dat$nfix2<- dat$nfixAll - dat$nfix1
 
 # calculate extra stuff:

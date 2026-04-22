@@ -110,6 +110,77 @@ for(i in 1:length(subs)){
 
 write.csv(refix_dat, file = 'data/Vasilev_2021_refixation_data.csv')
 
+
+######### second-pass refixation data:
+
+refix_dat2<- NULL
+subs<- unique(dat$sub)
+
+for(i in 1:length(subs)){
+  n<- subset(dat, sub==  subs[i])
+  nitems<- unique(n$item)
+  
+  for(j in 1:length(nitems)){
+    m<- subset(n, item== nitems[j])
+    
+    words<- unique(m$word)
+    words<- words[which(!is.na(words))]
+    
+    for(k in 1:length(words)){
+      o<- subset(m, word== words[k])
+      
+      if(nrow(o)>0){
+        o <- o[order(o$fix_num), ]
+        o$fix_order<- 1:nrow(o)
+        sec_pass<- which(o$regress==1)
+        o$refix_num_2ndpass<- NA
+        
+        if(length(sec_pass)>0){
+          o$refix_num_2ndpass[sec_pass]<- 1:length(which(o$regress==1))
+        }
+        
+        ## find fixation number terminating first pass:
+        which_first<- o[which(o$regress==0),]
+        
+        last_first<- NA
+        
+        if(length(which(which_first$regress==0))>0){
+          last_first<- max(which_first$fix_num)
+        }
+        
+        
+        if(length(last_first)>0 & is.finite(last_first)){
+          o$last_first_fix<- last_first
+        }else{
+          o$last_first_fix<- NA
+        }
+        
+        o$diff_from_last_fix<- o$fix_num - o$last_first_fix
+        
+        
+        #o$refix_num<- nrow(o)
+        refix_dat2<- rbind(refix_dat2, o)
+      }
+      
+      
+    }
+    
+    
+  }
+  
+  cat(i); cat(' ')
+  
+}
+
+write.csv(refix_dat2, file = 'data/Vasilev_2021_refixation_data_2ndpass.csv')
+
+
+
+
+
+
+
+
 df <- read_csv("data/Vasilev2021_word_data.csv")
 
 df$word_length<- nchar(df$wordID)
