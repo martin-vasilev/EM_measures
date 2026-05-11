@@ -24,7 +24,7 @@ new<- geco[,c("PP_NR", "PART", "TRIAL", "TRIAL_FIXATION_COUNT", "WORD_ID_WITHIN_
 rm(geco)
 
 colnames(new)<- c("sub", "part", "item", "nfix", "word", "wordUnique", "wordID", "nfixAll", "nfix1", "FFD", "GD", "GPT",
-                  "TVT", "skip", "FIRST_FIX_PROGRESSIVE")
+                  "TVT", "skip_1st", "FIRST_FIX_PROGRESSIVE")
 
 geco<- new
 rm(new)

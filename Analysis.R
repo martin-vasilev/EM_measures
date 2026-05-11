@@ -17,8 +17,19 @@ library(tidyverse)
 library(ggcorrplot)
 library(ggpubr)
 
+geco$word_length<- geco$word_len
 geco.c<- subset(geco, nfixAll<100)
-geco.c<- geco.c[,c(10, 15, 11, 12, 13)]
+
+# combine all datasets
+dat_all <- bind_rows(
+  geco     %>% mutate(corpus = "GECO",     sub = as.character(sub)),
+  Provo    %>% mutate(corpus = "Provo",    sub = as.character(sub)),
+  Oz       %>% mutate(corpus = "Oz",       sub = as.character(sub)),
+  textFont %>% mutate(corpus = "Text Font", sub = as.character(sub))
+)
+
+
+geco.c<- geco.c[,c(10, 17, 11, 12, 13)]
 
 colnames(geco.c)<- c("FFD", "SFD", "GD", "GPT", "TFT")
 
@@ -72,12 +83,423 @@ figure1 <- ggarrange(P1, P2, P3, P4, ncol = 2, nrow = 2,
 ggsave(filename = 'Plots/Corr_plot.pdf', plot = figure1,
        width = 8, height = 8)
 
+### First-pass fixation probability:
+
+content <- c(
+  "adjective",
+  "adverb",
+  "interjection",
+  "name",
+  "noun",
+  "number",
+  "verb"
+)
+
+function_words <- c(
+  "conjunction",
+  "determiner",
+  "marker",
+  "preposition",
+  "pronoun"
+)
+
+df_fp<- dat_all%>%
+ group_by(PoS)%>%
+ #group_by(corpus, PoS)%>%
+  mutate(fix_1st= ifelse(skip_1st==1, 0, 1))%>%
+  summarise(M= mean(fix_1st, na.rm= T),
+            N= n_distinct(wordID), #n(), #length(unique(sub)),
+            SD= sd(fix_1st, na.rm= T),
+            SE= SD/sqrt(N),
+            CI_lower= M- 1.96*SE,
+            CI_upper= M+1.96*SE)%>%
+            mutate(
+            word_type = case_when(
+              PoS %in% content ~ "content",
+              PoS %in% function_words ~ "function",
+              TRUE ~ "other"
+            )
+  )
+
+df_fp2 <- dat_all %>%
+  mutate(
+    fix_2nd = case_when(
+      
+      # skipped first pass, never fixated later
+      skip_1st == 1 & nfixAll == 0 ~ 0,
+      
+      # skipped first pass, but fixated later
+      skip_1st == 1 & nfixAll > 0 ~ 1,
+      
+      # first-pass fixated, then reread
+      skip_1st == 0 & TVT > GD ~ 1,
+      
+      # first-pass fixated, no rereading
+      skip_1st == 0 & TVT == GD ~ 0
+    ),
+    
+    fixated = ifelse(skip_1st == 0, "Yes", "No"),
+    fix_1st= ifelse(skip_1st==1, 0, 1)
+  ) %>%
+  group_by(PoS, fixated) %>%
+  summarise(
+    M = mean(fix_2nd, na.rm = TRUE),
+    N= n_distinct(wordID), #n(), #length(unique(sub)),
+    SD= sd(fix_2nd, na.rm= T),
+    SE= SD/sqrt(N),
+    CI_lower= M- 1.96*SE,
+    CI_upper= M+1.96*SE)%>%
+  mutate(
+    word_type = case_when(
+      PoS %in% content ~ "content",
+      PoS %in% function_words ~ "function",
+      TRUE ~ "other"
+    ))
+
+df_fp2
+
+pos_order <- df_fp %>%
+  filter(!is.na(PoS),
+         PoS != "NA",
+         PoS != "",
+         PoS != "unclassified") %>%
+  arrange(M) %>%
+  pull(PoS)
+
+df_fp$PoS  <- factor(df_fp$PoS, levels = pos_order)
+df_fp2$PoS <- factor(df_fp2$PoS, levels = pos_order)
+
+
+library(ggplot2)
+library(dplyr)
+
+PoS1<- df_fp %>%
+  filter(!is.na(PoS), PoS != "NA", PoS!= '', PoS!= 'unclassified') %>%
+  mutate(
+    #PoS = reorder(PoS, M, mean)
+  ) %>%
+  ggplot(aes(x = M, y = PoS, colour = word_type,
+             xmin= CI_lower, xmax= CI_upper)) +
+  #xlim(-0.2, 1.2)+
+  xlim(-0.31, 1)+
+  geom_point(size = 2)+
+ #            position = position_dodge(width = 0.5)) +
+  geom_errorbar(
+    width = 0)+
+  #   position = position_dodge(width = 0.5), linetype=1
+  # )+
+  theme_classic(base_size = 22) +
+  scale_colour_manual(values = pallete1[c(1,2,5,6)])+
+  scale_fill_manual(values = pallete1[c(1,2,5,6)])+
+  labs(
+    x = "Mean first-pass fixation probability",
+    y = "Part of speech",
+    colour = "Word type"
+  )+
+  theme(legend.position = c(0.85, 0.15),
+        legend.background = element_rect(
+          colour = "black",
+          fill = "white",
+          linewidth = 0.3
+        ))
+
+## second-pass fixation probability based on first-pass fixation probability:
+
+PoS2<- df_fp2 %>%
+  filter(!is.na(fixated),!is.na(PoS), PoS != "NA", PoS!= '', PoS!= 'unclassified') %>%
+  mutate(
+ #   PoS = reorder(PoS, M, mean)
+  ) %>%
+  ggplot(aes(x = M, y = PoS, colour = fixated,
+             xmin= CI_lower, xmax= CI_upper)) +
+  #xlim(-0.2, 1.2)+
+  xlim(-0.31, 1)+
+  geom_point(size = 2,
+              position = position_dodge(width = 0.5)) +
+  geom_errorbar(
+    width = 0,
+    position = position_dodge(width = 0.5), linetype=1
+  )+
+  theme_classic(base_size = 22) +
+  scale_colour_manual(values = pallete1[c(5,6)])+
+  scale_fill_manual(values = pallete1[c(5,6)])+
+ # facet_wrap(~word_type)+
+  labs(
+    x = "Mean second-pass fixation probability",
+    y = "Part of speech",
+    colour = "Fixated (first-pass)"
+  )+
+  theme(legend.position = c(0.75, 0.15),
+        legend.background = element_rect(
+          colour = "black",
+          fill = "white",
+          linewidth = 0.3
+        ))
+
+library(patchwork)
+
+PoS_all<- PoS1+ PoS2
+
+ggsave(filename = 'Plots/Pos.pdf', plot = PoS_all,
+       width= 16, height= 10)
+
 ### First-pass refixation probability:
 
 geco$refix_1st<- ifelse(geco$GD!= geco$FFD, 1, 0)
 Provo$refix_1st<- ifelse(Provo$GD!= Provo$FFD, 1, 0)
 textFont$refix_1st<- ifelse(textFont$GD!= textFont$FFD, 1, 0)
 Oz$refix_1st<- ifelse(Oz$GD!= Oz$FFD, 1, 0)
+
+
+# =========================================================
+# Sankey decomposition of TVT
+# =========================================================
+library(dplyr)
+library(tibble)
+library(networkD3)
+
+
+sankey_data <- dat_all %>%
+  mutate(
+    
+    # Fixation states
+    first_pass_fixated   = nfix1 > 0,
+    skipped_first_pass   = nfix1 == 0,
+    first_pass_refixated = nfix1 > 1,
+    second_pass_fixated  = nfix1 > 0 & TVT > GD,
+    skipped_later        = nfix1 == 0 & nfixAll > 0,
+    
+    # -----------------------------------------------------
+    # Duration components
+    # -----------------------------------------------------
+    
+    # First fixation duration
+    FFD_dur = ifelse(
+      first_pass_fixated,
+      FFD,
+      0
+    ),
+    
+    # Additional first-pass refixation duration
+    refix_dur = ifelse(
+      first_pass_refixated,
+      pmax(GD - FFD, 0),
+      0
+    ),
+    
+    # Additional second-pass rereading duration
+    secondpass_dur = ifelse(
+      second_pass_fixated,
+      pmax(TVT - GD, 0),
+      0
+    ),
+    
+    # Initially skipped but later fixated
+    skipped_later_dur = ifelse(
+      skipped_later,
+      TVT,
+      0
+    )
+  )
+
+# =========================================================
+# Total duration pool
+# =========================================================
+
+TOTAL_TIME <- sum(
+  sankey_data$FFD_dur,
+  sankey_data$refix_dur,
+  sankey_data$secondpass_dur,
+  sankey_data$skipped_later_dur,
+  na.rm = TRUE
+)
+
+# =========================================================
+# Compute node values
+# =========================================================
+
+firstpass_yes <- sankey_data %>%
+  summarise(
+    v = sum(
+      FFD_dur +
+        refix_dur +
+        secondpass_dur,
+      na.rm = TRUE
+    )
+  ) %>%
+  pull(v)
+
+firstpass_no <- sankey_data %>%
+  summarise(
+    v = sum(
+      skipped_later_dur,
+      na.rm = TRUE
+    )
+  ) %>%
+  pull(v)
+
+FFD_total <- sankey_data %>%
+  summarise(
+    v = sum(FFD_dur, na.rm = TRUE)
+  ) %>%
+  pull(v)
+
+refix_total <- sankey_data %>%
+  summarise(
+    v = sum(refix_dur, na.rm = TRUE)
+  ) %>%
+  pull(v)
+
+secondpass_total <- sankey_data %>%
+  summarise(
+    v = sum(secondpass_dur, na.rm = TRUE)
+  ) %>%
+  pull(v)
+
+skip_later_total <- sankey_data %>%
+  summarise(
+    v = sum(skipped_later_dur, na.rm = TRUE)
+  ) %>%
+  pull(v)
+
+# =========================================================
+# Create Sankey links
+# =========================================================
+
+links <- data.frame(
+  
+  source = c(
+    "TFD",
+    "TFD",
+    
+    "First-pass fixated",
+    "First-pass fixated",
+    "First-pass fixated",
+    
+    "First-pass skipped"
+  ),
+  
+  target = c(
+    "First-pass fixated",
+    "First-pass skipped",
+    
+    "FFD",
+    "First-pass refixation\n(GD - FFD)",
+    "Second-pass fixation\n(TVT - GD)",
+    
+    "Later fixation after skip"
+  ),
+  
+  value = c(
+    100 * firstpass_yes / TOTAL_TIME,
+    100 * firstpass_no / TOTAL_TIME,
+    
+    100 * FFD_total / TOTAL_TIME,
+    100 * refix_total / TOTAL_TIME,
+    100 * secondpass_total / TOTAL_TIME,
+    
+    100 * skip_later_total / TOTAL_TIME
+  )
+)
+
+# Remove empty flows
+links <- links %>%
+  filter(value > 0)
+
+# =========================================================
+# Create nodes with percentages
+# =========================================================
+
+node_percents <- links %>%
+  group_by(target) %>%
+  summarise(
+    percent = sum(value),
+    .groups = "drop"
+  ) %>%
+  rename(name = target) %>%
+  bind_rows(
+    tibble(
+      name = "TFD",
+      percent = 100
+    )
+  ) %>%
+  distinct(name, .keep_all = TRUE) %>%
+  mutate(
+    label = paste0(
+      name,
+      "\n",
+      sprintf("%.1f%%", percent)
+    )
+  )
+
+nodes <- data.frame(
+  name = unique(c(links$source, links$target))
+) %>%
+  left_join(node_percents, by = "name") %>%
+  mutate(
+    label = ifelse(
+      is.na(label),
+      name,
+      label
+    )
+  )
+
+# =========================================================
+# Convert node labels to IDs
+# =========================================================
+
+links$IDsource <- match(
+  links$source,
+  nodes$name
+) - 1
+
+links$IDtarget <- match(
+  links$target,
+  nodes$name
+) - 1
+
+# =========================================================
+# Plot Sankey
+# =========================================================
+
+sankey<- sankeyNetwork(
+  Links = links,
+  Nodes = nodes,
+  Source = "IDsource",
+  Target = "IDtarget",
+  Value = "value",
+  NodeID = "label",
+  fontSize = 32,
+  nodeWidth = 35,
+  sinksRight = FALSE
+)
+
+library(webshot2)
+# Save HTML
+saveNetwork(
+  sankey,
+  "Plots/sankey.html",
+  selfcontained = TRUE
+)
+
+# Direct HTML -> PDF
+webshot(
+  "Plots/sankey.html",
+  file = "sankey.pdf",
+  vwidth = 1800,
+  vheight = 1200,
+  zoom = 2
+)
+
+webshot(
+  "Plots/sankey.html",
+  file = "Plots/sankey.png",
+  vwidth = 1600,
+  vheight = 1000,
+  zoom = 2
+)
+
+
 
 ## refixation probability:
 
@@ -453,15 +875,6 @@ textFont %>%
 
 #textFont %>% group_by(refix_1st)%>%
 #  summarise(M= mean(FFD, na.rm=T))
-
-geco$word_length<- geco$word_len
-
-dat_all <- bind_rows(
-  geco     %>% mutate(corpus = "GECO",     sub = as.character(sub)),
-  Provo    %>% mutate(corpus = "Provo",    sub = as.character(sub)),
-  Oz       %>% mutate(corpus = "Oz",       sub = as.character(sub)),
-  textFont %>% mutate(corpus = "Text Font", sub = as.character(sub))
-)
 
 library(dplyr)
 library(ggplot2)
@@ -975,8 +1388,63 @@ ggsave("Plots/GD_combined.pdf",
 
 # TFD------- How many 2nd-pass re-fixations do words receive?
 
+nfix2<- dat_all%>%
+  mutate(nfix2= nfixAll - nfix1,
+         nfix2 = pmin(nfix2, 5))%>%
+  group_by(corpus)%>%
+  count(nfix2)%>%
+  filter(!is.na(n) &nfix2>=0)%>%
+  mutate(
+    total = sum(n),              
+    prop = n / total,           
+    perc = prop * 100,
+    nfix2= as.character(nfix2)
+  )
+head(nfix2) 
+
+#nfix2$nfix2[which(nfix2$nfix2=='5')]<- '5+'
+
+nfix2 <- nfix2 %>%
+  mutate(
+    nfix2 = factor(nfix2, levels = c(5, 4, 3, 2, 1, 0),
+                   labels = c("5+", "4", "3", "2", "1", "0"))
+  )
+
+ggplot(nfix2, aes(x = corpus, y = perc, fill = nfix2)) +
+  geom_col() +
+  theme_bw(24) +
+  scale_fill_manual(values = pallete1)+
+  labs(
+    x = "Corpus",
+    y = "Percentage",
+    fill = "Number of second-pass fixations"
+  )+
+  theme(legend.position = 'right')
+
+
+##### show components contributing to TFD:
+
+dat_all%>% 
+  group_by(corpus)%>%
+  summarise(M= mean(skip_1st, na.rm= T),
+            M2= mean(skip, na.rm=T))
+
+dat_all%>% 
+  filter(corpus== "Text Font"| corpus== "Oz")%>%
+  group_by(skip_1st)%>%
+  summarise(M= mean(TVT, na.rm=T))
+
+dat_all%>% 
+  #filter(corpus== "Text Font"| corpus== "Oz")%>%
+  mutate(regress_time_nonfixated= ifelse(is.na(FFD)&!is.na(TVT), TVT, 0),
+         regress_time_fixated= ifelse(regress_time_nonfixated>0, 0, TVT-GD))%>%
+  group_by(corpus)%>%
+  summarise(M_nonfix= mean(regress_time_nonfixated, na.rm= T),
+            M_fix= mean(regress_time_fixated, na.rm= T))
+
 dat_all<- dat_all%>%
-      mutate(nfix2= nfixAll - nfix1)
+  mutate(regress_time_nonfixated= ifelse(is.na(FFD)&!is.na(TVT), TVT, 0),
+         regress_time_fixated= ifelse(regress_time_nonfixated>0, 0, TVT-GD))
 
 
 

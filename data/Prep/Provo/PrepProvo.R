@@ -71,7 +71,7 @@ colnames(dat)<- c("sub", "unique_ID", "item", "word", "sent",
                   "cloze", "cloze_model", "Certainty", 
                   "POS_CLAWS", "word_type", "Word_POS", "seq",
                   "IA_LEFT", "IA_RIGHT", "FFD", "land_x", 'First_fix_progressive', 
-                  "GD", "nfix1", "TVT", 'nfixAll', "skip", "GPT")
+                  "GD", "nfix1", "TVT", 'nfixAll', "skip_1st", "GPT")
 
 dat$Certainty<- NULL
 

@@ -31,7 +31,9 @@ if('EMreading' %in% rownames(installed.packages())==FALSE){
 # 
 # OZ$wordID<- gsub("#####", "", OZ$wordID)
 # OZ$word_length<- nchar(as.character(OZ$wordID))
- OZ<- Frequency(OZ, PoS = T)
+Oz<- read.csv("data/Oz_words.csv")
+Oz<- Frequency(Oz, PoS = T)
 
 
-save(OZ, file= "data/OZ.Rda")
+save(Oz, file= "data/OZ.Rda")
+write.csv(Oz, file= "data/OZ_words.csv")
