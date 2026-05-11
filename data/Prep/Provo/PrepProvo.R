@@ -82,36 +82,53 @@ dat$nfix1[which(dat$First_fix_progressive==0)]<- 0
 dat$nfix2<- dat$nfixAll - dat$nfix1
 
 # calculate extra stuff:
-dat$land_pos<- NA
-dat$SFD<- NULL
 
-for(i in 1:nrow(dat)){
-  
-  if(!is.na(dat$FFD[i]) & !is.na(dat$GD[i])){
-    if(dat$FFD[i]== dat$GD[i]){
-      dat$SFD[i]<- dat$FFD[i] 
-    }else{
-      dat$SFD[i]<- NA
-    }
+library(tidyverse)
+
+dat <- dat %>%
+  mutate(
+    SFD = if_else(
+      !is.na(FFD) & !is.na(GD) & FFD == GD,
+      FFD,
+      NA_real_
+    ),
     
-  }else{
-    dat$SFD[i]<- NA
-  }
-  
-  # landing position:
-  ppl= (dat$IA_RIGHT[i] - dat$IA_LEFT[i])/ dat$word_length[i] 
-  dat$land_pos[i]<- floor((dat$land_x[i] -dat$IA_LEFT[i])/ppl)+1
-
-  # fix 0s in TVT while we're at it..
-  if(!is.na(dat$TVT[i])){
-    if(dat$TVT[i]==0){
-      dat$TVT[i]<- NA
-    }
+    ppl = (IA_RIGHT - IA_LEFT) / word_length,
+    land_pos = floor((land_x - IA_LEFT) / ppl) + 1,
     
-  }
-
-  print(i)
-}
+    TVT = if_else(TVT == 0, NA_real_, TVT)
+  ) %>%
+  select(-ppl)
+# dat$land_pos<- NA
+# dat$SFD<- NULL
+# 
+# for(i in 1:nrow(dat)){
+#   
+#   if(!is.na(dat$FFD[i]) & !is.na(dat$GD[i])){
+#     if(dat$FFD[i]== dat$GD[i]){
+#       dat$SFD[i]<- dat$FFD[i] 
+#     }else{
+#       dat$SFD[i]<- NA
+#     }
+#     
+#   }else{
+#     dat$SFD[i]<- NA
+#   }
+#   
+#   # landing position:
+#   ppl= (dat$IA_RIGHT[i] - dat$IA_LEFT[i])/ dat$word_length[i] 
+#   dat$land_pos[i]<- floor((dat$land_x[i] -dat$IA_LEFT[i])/ppl)+1
+# 
+#   # fix 0s in TVT while we're at it..
+#   if(!is.na(dat$TVT[i])){
+#     if(dat$TVT[i]==0){
+#       dat$TVT[i]<- NA
+#     }
+#     
+#   }
+# 
+#   #print(i)
+# }
 
 Provo= dat
 colnames(dat)
@@ -120,7 +137,7 @@ colnames(dat)
 #                "POS_CLAWS", "word_type", "Word_POS", "unique_ID")]
 # 
 ## Add frequency:
-Provo<- Frequency(Provo, database = "SUBTLEX-US")
+Provo<- Frequency(Provo, database = "SUBTLEX-UK", PoS= T)
 
 
 save(Provo, file= "data/Provo.Rda")

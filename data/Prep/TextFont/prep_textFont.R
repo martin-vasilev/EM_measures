@@ -180,14 +180,14 @@ write.csv(refix_dat2, file = 'data/Vasilev_2021_refixation_data_2ndpass.csv')
 
 
 
-
+library(readr)
 df <- read_csv("data/Vasilev2021_word_data.csv")
 
 df$word_length<- nchar(df$wordID)
 
 library(EMreading)
-df<- Frequency(df)
+df<- Frequency(df, PoS= T)
 
 write.csv(df, file = "data/Vasilev2021_word_data.csv")
-
+ 
 

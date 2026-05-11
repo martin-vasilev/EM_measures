@@ -59,7 +59,7 @@ geco$word_len <- nchar(geco$wordID)
 # remove cases with empty "words":
 geco<- geco[-which(geco$wordID==''),]
 
-geco<- Frequency(geco, database = "SUBTLEX-US")
+geco<- Frequency(geco, database = "SUBTLEX-UK", PoS = T)
 
 
 save(geco, file= "data/geco.Rda")
