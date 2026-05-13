@@ -497,8 +497,507 @@ ggsave(filename = 'Plots/Stats_Plot.png', plot = Stats_P, width= 8,
 
 
 
-### Plot showing classification of eye-movements during reading:
-rm(list= ls())
+#########################################
 
-load("~/R/EM_measures/data/Prep/Provo/OSFdata.Rda")
+# Visualise first-pass vs second pass reading:
+
+windowsFonts(
+  Consolas = windowsFont("Consolas")
+)
+
+coords<-  read.csv("data/visualisation_data/text_font/coords_E2I9.csv")
+
+load("data/visualisation_data/text_font/raw_fix.Rda")
+
+dat<- subset(raw_fix, sub== 2 & item== 9)
+rm(raw_fix)
+
+dat_arrows <- dat %>%
+  #arrange(fix_num) %>%
+  mutate(
+    xend = lead(xPos-8),
+    yend = lead(yPos - 8),
+    ystart = yPos - 8,
+    next_fix = lead(word),
+    is_back = next_fix < word
+  ) %>%
+  filter(!is.na(xend))
+
+dat_arrows$is_back<- ifelse(dat_arrows$is_back== TRUE, "Regressive", "Progressive")
+dat_arrows$is_back[15]<- 'Regressive'
+dat_arrows$is_back[16]<- 'Progressive'
+
+dat_arrows$xend[which(dat_arrows$is_back== TRUE)]<- dat_arrows$xend[which(dat_arrows$is_back== TRUE)]+16
+
+dat$regress[16]<- 1
+
+library(ggplot2)
+library(dplyr)
+library(grid)
+
+# ---------------------------------------------------------
+# Register Windows font
+# ---------------------------------------------------------
+
+windowsFonts(
+  Consolas = windowsFont("Consolas")
+)
+
+# ---------------------------------------------------------
+# Load data
+# ---------------------------------------------------------
+
+coords <- read.csv("data/visualisation_data/text_font/coords_E2I9.csv")
+
+load("data/visualisation_data/text_font/raw_fix.Rda")
+
+dat <- subset(raw_fix, sub == 2 & item == 9)
+
+rm(raw_fix)
+
+# ---------------------------------------------------------
+# Recode regression variable
+# ---------------------------------------------------------
+
+dat <- dat %>%
+  mutate(
+    regress_type = case_when(
+      regress == 0 ~ "Progressive",
+      regress == 1 ~ "Regressive",
+      TRUE ~ NA_character_
+    )
+  )
+
+# ---------------------------------------------------------
+# Prepare arrow data
+# ---------------------------------------------------------
+
+dat_arrows <- dat %>%
+  mutate(
+    xend = lead(xPos - 8),
+    yend = lead(yPos - 8),
+    ystart = yPos - 8,
+    next_fix = lead(word),
+    is_back = next_fix < word
+  ) %>%
+  filter(!is.na(xend))
+
+dat_arrows$is_back <- ifelse(
+  dat_arrows$is_back,
+  "Regressive",
+  "Progressive"
+)
+
+dat_arrows$is_back[15] <- "Regressive"
+dat_arrows$is_back[16] <- "Progressive"
+
+dat_arrows$xend[
+  dat_arrows$is_back == "Regressive"
+] <- dat_arrows$xend[
+  dat_arrows$is_back == "Regressive"
+] + 16
+
+
+# fix some labels:
+dat$regress[16]<- 1
+dat$regress_type[16]<- "Progressive"
+dat$regress_type[10]<- "Regressive"
+
+dat_arrows$regress_type[5]<- "Regressive"
+dat_arrows$regress_type[10]<- "Regressive"
+dat_arrows$regress_type[12]<- "Progressive"
+dat_arrows$regress_type[16]<- "Progressive"
+dat_arrows$regress_type[19]<- "Regressive"
+
+# ---------------------------------------------------------
+# Plot
+# ---------------------------------------------------------
+
+P_pass <- dat %>%
+  ggplot(aes(x = xPos, y = yPos)) +
+  
+  theme_classic(base_size = 28) +
+  
+  scale_y_reverse() +
+  
+  # -----------------------------------------------------
+# Text stimulus
+# -----------------------------------------------------
+
+geom_text(
+  data = coords,
+  aes(
+    x = (x1 + x2) / 2,
+    y = (y1 + y2) / 2,
+    label = letter
+  ),
+  family = "Consolas",
+  color = "black",
+  size = 10,
+  inherit.aes = FALSE
+) +
+  
+  # -----------------------------------------------------
+# Saccade arrows
+# -----------------------------------------------------
+
+geom_curve(
+  data = dat_arrows,
+  aes(
+    x = xPos,
+    y = ystart,
+    xend = xend,
+    yend = yend,
+    linetype = regress_type,
+    color = regress_type
+  ),
+  arrow = arrow(
+    length = unit(0.05, "inches"),
+    type = "closed"
+  ),
+  curvature = -0.4,
+  alpha = 0.45,
+  linewidth= 0.9,
+  show.legend = FALSE
+) +
+  
+  # -----------------------------------------------------
+# Fixations
+# -----------------------------------------------------
+
+geom_point(
+  aes(
+    y = yPos - 8,
+    size = fix_dur,
+    fill = regress_type
+  ),
+  shape = 21,
+  color = "black",
+  alpha = 0.33
+) +
+  
+  scale_fill_manual(
+    name = "Reading passes",
+    
+    values = c(
+      "Progressive" = "blue",
+      "Regressive" = "red"
+    ),
+    
+    labels = c(
+      "Progressive" = "First pass",
+      "Regressive" = "Second pass"
+    ),
+    
+    breaks = c(
+      "Progressive",
+      "Regressive"
+    ),
+    
+    na.value = "grey70"
+  ) +
+  
+  guides(
+    fill = guide_legend(
+      override.aes = list(size = 5)
+    ))+
+  
+  scale_color_manual(
+    values = c(
+      "Progressive" = "blue",
+      "Regressive" = "red"
+    ),
+    guide = "none"
+  )+
+  
+  scale_size(
+    range = c(12, 25),
+    name = "Fixation duration (ms)"
+  ) +
+  
+  # -----------------------------------------------------
+# Fixation numbers
+# -----------------------------------------------------
+
+geom_text(
+  aes(
+    y = yPos - 8,
+    label = fix_num
+  ),
+  size = 10
+) +
+  
+  # -----------------------------------------------------
+# Labels
+# -----------------------------------------------------
+
+# labs(
+#   linetype = "Type of saccade"
+# ) +
+#   
+  # -----------------------------------------------------
+# Theme cleanup
+# -----------------------------------------------------
+
+theme(
+  axis.line = element_blank(),
+  axis.text = element_blank(),
+  axis.ticks = element_blank(),
+  axis.title = element_blank(),
+  
+  legend.position = "bottom"
+) +
+  
+  ggtitle("a)")
+
+
+P_pass
+
+ggsave(plot = P_pass, filename = 'Plots/Trial_visualisation_passes.pdf', width = 10.5, 
+       height = 6, device = cairo_pdf)  
+
+
+### Add fixation probabilities for different passes:
+
+load("data/Provo.Rda") # Provo corpus
+load("data/geco.Rda") # GECO corpus
+textFont <- read.csv("data/Vasilev2021_word_data.csv")
+Oz<- read.csv("data/Oz_words.csv")
+
+geco$word_length<- geco$word_len
+geco.c<- subset(geco, nfixAll<100)
+
+# combine all datasets
+dat_all <- bind_rows(
+  geco     %>% mutate(corpus = "GECO",     sub = as.character(sub)),
+  Provo    %>% mutate(corpus = "Provo",    sub = as.character(sub)),
+  Oz       %>% mutate(corpus = "Oz",       sub = as.character(sub)),
+  textFont %>% mutate(corpus = "Text Font", sub = as.character(sub))
+)
+
+### First-pass fixation probability:
+
+content <- c(
+  "adjective",
+  "adverb",
+  "interjection",
+  "name",
+  "noun",
+  "number",
+  "verb"
+)
+
+function_words <- c(
+  "conjunction",
+  "determiner",
+  "marker",
+  "preposition",
+  "pronoun"
+)
+
+df_fp<- dat_all%>%
+  group_by(PoS)%>%
+  #group_by(corpus, PoS)%>%
+  mutate(fix_1st= ifelse(skip_1st==1, 0, 1))%>%
+  summarise(M= mean(fix_1st, na.rm= T),
+            N= n_distinct(wordID), #n(), #length(unique(sub)),
+            SD= sd(fix_1st, na.rm= T),
+            SE= SD/sqrt(N),
+            CI_lower= M- 1.96*SE,
+            CI_upper= M+1.96*SE)%>%
+  mutate(
+    word_type = case_when(
+      PoS %in% content ~ "content",
+      PoS %in% function_words ~ "function",
+      TRUE ~ "other"
+    )
+  )
+
+df_fp2 <- dat_all %>%
+  mutate(
+    fix_2nd = case_when(
+      
+      # skipped first pass, never fixated later
+      skip_1st == 1 & nfixAll == 0 ~ 0,
+      
+      # skipped first pass, but fixated later
+      skip_1st == 1 & nfixAll > 0 ~ 1,
+      
+      # first-pass fixated, then reread
+      skip_1st == 0 & TVT > GD ~ 1,
+      
+      # first-pass fixated, no rereading
+      skip_1st == 0 & TVT == GD ~ 0
+    ),
+    
+    fixated = ifelse(skip_1st == 0, "Yes", "No"),
+    fix_1st= ifelse(skip_1st==1, 0, 1)
+  ) %>%
+  group_by(PoS, fixated) %>%
+  summarise(
+    M = mean(fix_2nd, na.rm = TRUE),
+    N= n_distinct(wordID), #n(), #length(unique(sub)),
+    SD= sd(fix_2nd, na.rm= T),
+    SE= SD/sqrt(N),
+    CI_lower= M- 1.96*SE,
+    CI_upper= M+1.96*SE)%>%
+  mutate(
+    word_type = case_when(
+      PoS %in% content ~ "content",
+      PoS %in% function_words ~ "function",
+      TRUE ~ "other"
+    ))
+
+df_fp2
+
+pos_order <- df_fp %>%
+  filter(!is.na(PoS),
+         PoS != "NA",
+         PoS != "",
+         PoS != "unclassified") %>%
+  arrange(M) %>%
+  pull(PoS)
+
+df_fp$PoS  <- factor(df_fp$PoS, levels = pos_order)
+df_fp2$PoS <- factor(df_fp2$PoS, levels = pos_order)
+
+
+library(ggplot2)
+library(dplyr)
+
+PoS1<- df_fp %>%
+  filter(!is.na(PoS), PoS != "NA", PoS!= '', PoS!= 'unclassified') %>%
+  mutate(
+    #PoS = reorder(PoS, M, mean)
+  ) %>%
+  ggplot(aes(x = M, y = PoS, colour = word_type,
+             xmin= CI_lower, xmax= CI_upper)) +
+  #xlim(-0.2, 1.2)+
+  xlim(-0.31, 1)+
+  geom_point(size = 2)+
+  #            position = position_dodge(width = 0.5)) +
+  geom_errorbar(
+    width = 0)+
+  #   position = position_dodge(width = 0.5), linetype=1
+  # )+
+  theme_classic(base_size = 28) +
+  scale_colour_manual(values = pallete1[c(1,2,5,6)])+
+  scale_fill_manual(values = pallete1[c(1,2,5,6)])+
+  labs(
+    x = "Mean first-pass fixation probability",
+    y = "Part of speech",
+    colour = "Word type"
+  )+
+  theme(legend.position = c(0.85, 0.15),
+        legend.background = element_rect(
+          colour = "black",
+          fill = "white",
+          linewidth = 0.3
+        ))+
+  ggtitle('b)\n')
+
+## second-pass fixation probability based on first-pass fixation probability:
+
+PoS2<- df_fp2 %>%
+  filter(!is.na(fixated),!is.na(PoS), PoS != "NA", PoS!= '', PoS!= 'unclassified') %>%
+  mutate(
+    #   PoS = reorder(PoS, M, mean)
+  ) %>%
+  ggplot(aes(x = M, y = PoS, colour = fixated,
+             xmin= CI_lower, xmax= CI_upper)) +
+  #xlim(-0.2, 1.2)+
+  xlim(-0.31, 1)+
+  geom_point(size = 2,
+             position = position_dodge(width = 0.5)) +
+  geom_errorbar(
+    width = 0,
+    position = position_dodge(width = 0.5), linetype=1
+  )+
+  theme_classic(base_size = 28) +
+  scale_colour_manual(values = pallete1[c(5,6)])+
+  scale_fill_manual(values = pallete1[c(5,6)])+
+  # facet_wrap(~word_type)+
+  labs(
+    x = "Mean second-pass fixation probability",
+    y = "Part of speech",
+    colour = "Fixated (first-pass)"
+  )+
+  theme(legend.position = c(0.75, 0.15),
+        legend.background = element_rect(
+          colour = "black",
+          fill = "white",
+          linewidth = 0.3
+        ))+
+  ggtitle('c)\n')
+
+library(patchwork)
+P_pass <- P_pass +
+  
+  # ---------------------------------------------------
+# Legend layout
+# ---------------------------------------------------
+
+theme(
+  legend.position = "bottom",
+  
+  # stack legends vertically
+  legend.box = "vertical",
+  
+  # keep contents vertical by default
+  legend.direction = "vertical",
+  
+  # align legends to left
+  legend.justification = "left",
+  legend.box.just = "left",
+  
+  # spacing
+  legend.spacing.y = unit(0.15, "cm")
+) +
+  
+  # ---------------------------------------------------
+# Individual legend guides
+# ---------------------------------------------------
+
+guides(
+  
+  # fixation type legend
+  fill = guide_legend(
+    order = 1,
+    
+    # slightly larger legend dots
+    override.aes = list(
+      size = 5,
+      alpha = 0.45
+    )
+  ),
+  
+  # fixation duration legend
+  size = guide_legend(
+    order = 2,
+    
+    # make keys horizontal
+    direction = "horizontal",
+    
+    # one row of circles
+    nrow = 1,
+    
+    # slightly larger symbols
+    override.aes = list(
+      alpha = 0.5
+    )
+  )
+)
+
+P_pass
+
+PoS_all <- P_pass / (PoS1 + PoS2) +
+  plot_layout(heights = c(1, 1))
+
+ggsave(
+  filename = "Plots/Pos.pdf",
+  plot = PoS_all,
+  width = 18,
+  height = 22,
+  device = cairo_pdf
+)
 
