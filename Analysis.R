@@ -85,6 +85,37 @@ ggsave(filename = 'Plots/Corr_plot.pdf', plot = figure1,
 
 ### First-pass fixation probability:
 
+## descriptuves for first-pass fixation probability by corpus:
+
+dat_all%>%
+  group_by(corpus)%>%
+  mutate(fix_1st= ifelse(skip_1st==1, 0, 1))%>%
+  summarise(M= mean(fix_1st, na.rm= T),
+            SD= sd(fix_1st, na.rm= T))
+
+#### descriptive statistics for second pass fixation probability:
+
+dat_all %>%
+  mutate(
+    fix_2nd = case_when(
+      
+      # skipped first pass, never fixated later
+      skip_1st == 1 & nfixAll == 0 ~ 0,
+      
+      # skipped first pass, but fixated later
+      skip_1st == 1 & nfixAll > 0 ~ 1,
+      
+      # first-pass fixated, then reread
+      skip_1st == 0 & TVT > GD ~ 1,
+      
+      # first-pass fixated, no rereading
+      skip_1st == 0 & TVT == GD ~ 0
+    ))%>%
+  group_by(corpus)%>%
+  summarise(M= mean(fix_2nd, na.rm= T),
+            SD= sd(fix_2nd, na.rm= T))
+
+
 content <- c(
   "adjective",
   "adverb",
@@ -249,13 +280,6 @@ geco$refix_1st<- ifelse(geco$GD!= geco$FFD, 1, 0)
 Provo$refix_1st<- ifelse(Provo$GD!= Provo$FFD, 1, 0)
 textFont$refix_1st<- ifelse(textFont$GD!= textFont$FFD, 1, 0)
 Oz$refix_1st<- ifelse(Oz$GD!= Oz$FFD, 1, 0)
-
-
-
-
-
-
-
 
 
 ## refixation probability:
