@@ -204,57 +204,100 @@ write.csv(df, file = "data/Vasilev2021_word_data.csv")
 
 
 
-######## Parse fixations
+######## Parse fixations contributing to GPT
 
-words<- subset(df, sub == 7 & item == 62)
+df <- read_csv("data/Vasilev2021_word_data.csv")
+words <- subset(df, sub == 7 & item == 62)
 
 load("~/R/EM_measures/data/visualisation_data/text_font/raw_fix.Rda")
 
-fixations <- subset(raw_fix, sub == 7 & item == 62) 
+fixations <- subset(raw_fix, sub == 7 & item == 62)
 
-fixated_words<- unique(fixations$word)
+library(dplyr)
 
-fixations$max_word_fixated<- NA
-fixations$GPT_terminated<- 
-fixations$next_fixated_word<-NA  
-
-max_fixated<- 0
-
-for(i in 1:nrow(fixations)){
-  
-  if(i==1){
-    max_fixated<- fixations$word[i]
-  #  fixations$GPT_terminated[i]<- 0
-  }else{
-    if(!is.na(fixations$word[i])){
-      if(fixations$word[i]>max_fixated){
-        max_fixated<- fixations$word[i]
-        
-        # set GPT as terminated:
-        #fixations$GPT_terminated[-1]<- 1
-        
-      }else{
-        # nothing happens
-        #fixations$GPT_terminated[i]<- 0
-      }
-    }
-  }
-  
-  fixations$max_word_fixated[i] <-max_fixated
-  
-  ## add next fixated word:
-  if(i< nrow(fixations)){
-    fixations$next_fixated_word[i]<- fixations$word[i+1]
-  }
-  
-  
-}
-
-fixations$GPT_terminated<- ifelse(fixations$max_word_fixated< fixations$next_fixated_word, 1, 0)
-fixations$fixations_left<- ifelse(fixations$GPT_terminated==0 & fixations$word< fixations$max_word_fixated, 1, 0) 
-fixations$refixations_GPT<- ifelse(fixations$GPT_terminated==0 & fixations$word== fixations$max_word_fixated, 1, 0) 
-
-
-which(fixations$max_word_fixated> fixations$word)
-
+fixations <- fixations %>%
+  mutate(
+    max_word_fixated = cummax(word),
+    prev_max_word_fixated = lag(max_word_fixated, default = first(word)),
+    next_fixated_word = lead(word),
+    
+    GPT_terminated = ifelse(
+      !is.na(next_fixated_word) &
+        next_fixated_word > max_word_fixated,
+      1, 0
+    ),
+    
+    fixations_left = ifelse(
+      word < prev_max_word_fixated,
+      1, 0
+    ),
+    
+    # New segment each time a new rightmost word is reached
+    GPT_segment = cumsum(word > lag(max_word_fixated, default = -Inf))
+  ) %>%
+  group_by(GPT_segment) %>%
+  mutate(
+    # Has there already been a regression left from this current max word?
+    has_regressed_left_from_max = lag(
+      cumany(word < max_word_fixated),
+      default = FALSE
+    ),
+    
+    refixations_GPT = ifelse(
+      word == max_word_fixated &
+        has_regressed_left_from_max,
+      1, 0
+    )
+  ) %>%
+  ungroup()
+# words<- subset(df, sub == 7 & item == 62)
+# 
+# load("~/R/EM_measures/data/visualisation_data/text_font/raw_fix.Rda")
+# 
+# fixations <- subset(raw_fix, sub == 7 & item == 62) 
+# 
+# ## new data frame specifying when GPT was terminated:
+# fixated_words<- sort(unique(fixations$word))
+# GPT_term<- data.frame('word'= fixated_words)
+# GPT_term$time<-NA
+# 
+# fixations$max_word_fixated<- NA
+# fixations$GPT_terminated<- 
+# fixations$next_fixated_word<-NA  
+# 
+# max_fixated<- 0
+# 
+# for(i in 1:nrow(fixations)){
+#   
+#   if(i==1){
+#     max_fixated<- fixations$word[i]
+# 
+#   }else{
+#     if(!is.na(fixations$word[i])){
+#       if(fixations$word[i]>max_fixated){
+#         max_fixated<- fixations$word[i]
+#         
+#       }else{
+#         # nothing happens
+#       }
+#     }
+#   }
+#   
+#   fixations$max_word_fixated[i] <-max_fixated
+#   
+#   ## add next fixated word:
+#   if(i< nrow(fixations)){
+#     fixations$next_fixated_word[i]<- fixations$word[i+1]
+#   }
+#   
+#   
+# }
+# 
+# fixations$GPT_terminated<- ifelse(fixations$max_word_fixated< fixations$next_fixated_word, 1, 0)
+# fixations$fixations_left<- ifelse(fixations$GPT_terminated==0 & fixations$word< fixations$max_word_fixated, 1, 0) 
+# fixations$refixations_GPT<- ifelse(fixations$GPT_terminated==0 & fixations$word== fixations$max_word_fixated, 1, 0) 
+# 
+# 
+# which(fixations$max_word_fixated> fixations$word)
+# 
 
