@@ -185,9 +185,76 @@ df <- read_csv("data/Vasilev2021_word_data.csv")
 
 df$word_length<- nchar(df$wordID)
 
+
+
+
+
+
+
+
 library(EMreading)
 df<- Frequency(df, PoS= T)
 
+
+
+
+
 write.csv(df, file = "data/Vasilev2021_word_data.csv")
  
+
+
+
+######## Parse fixations
+
+words<- subset(df, sub == 7 & item == 62)
+
+load("~/R/EM_measures/data/visualisation_data/text_font/raw_fix.Rda")
+
+fixations <- subset(raw_fix, sub == 7 & item == 62) 
+
+fixated_words<- unique(fixations$word)
+
+fixations$max_word_fixated<- NA
+fixations$GPT_terminated<- 
+fixations$next_fixated_word<-NA  
+
+max_fixated<- 0
+
+for(i in 1:nrow(fixations)){
+  
+  if(i==1){
+    max_fixated<- fixations$word[i]
+  #  fixations$GPT_terminated[i]<- 0
+  }else{
+    if(!is.na(fixations$word[i])){
+      if(fixations$word[i]>max_fixated){
+        max_fixated<- fixations$word[i]
+        
+        # set GPT as terminated:
+        #fixations$GPT_terminated[-1]<- 1
+        
+      }else{
+        # nothing happens
+        #fixations$GPT_terminated[i]<- 0
+      }
+    }
+  }
+  
+  fixations$max_word_fixated[i] <-max_fixated
+  
+  ## add next fixated word:
+  if(i< nrow(fixations)){
+    fixations$next_fixated_word[i]<- fixations$word[i+1]
+  }
+  
+  
+}
+
+fixations$GPT_terminated<- ifelse(fixations$max_word_fixated< fixations$next_fixated_word, 1, 0)
+fixations$fixations_left<- ifelse(fixations$GPT_terminated==0 & fixations$word< fixations$max_word_fixated, 1, 0) 
+fixations$refixations_GPT<- ifelse(fixations$GPT_terminated==0 & fixations$word== fixations$max_word_fixated, 1, 0) 
+
+
+which(fixations$max_word_fixated> fixations$word)
+
 
