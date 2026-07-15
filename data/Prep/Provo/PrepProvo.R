@@ -21,7 +21,8 @@ if('EMreading' %in% rownames(installed.packages())==FALSE){
 load("data/Prep/Provo/OSFdata.Rda")
 
 # let's get of some unnecessary columns:
-dat$RECORDING_SESSION_LABEL<- NULL
+#dat$RECORDING_SESSION_LABEL<- NULL
+dat$Participant_ID<- NULL
 dat$Word_Cleaned<-NULL
 dat$Total_Response_Count<- NULL
 dat$Unique_Count<- NULL
@@ -140,5 +141,90 @@ colnames(dat)
 Provo<- Frequency(Provo, database = "SUBTLEX-UK", PoS= T)
 
 
-save(Provo, file= "data/Provo.Rda")
-write.csv(Provo, "Data/Provo.csv")
+
+##### ADD extra GPT variables:
+# load raw fixation data:
+load("~/R/EM_measures/data/Prep/Provo/Provo_raw.Rda")
+
+library(tidyverse)
+
+df<- raw_dat%>%
+  transmute('sub'= RECORDING_SESSION_LABEL,
+            'item'= page,
+            'fix_num'= CURRENT_FIX_INDEX,
+            'word'= CURRENT_FIX_INTEREST_AREA_INDEX,
+            'word_ID'= CURRENT_FIX_INTEREST_AREA_LABEL,
+            'fix_dur'= CURRENT_FIX_DURATION
+            )
+
+df$word<- as.numeric(df$word)
+
+head(df)
+
+library(dplyr)
+
+fixations <- df %>%
+  filter(!is.na(word))%>%
+  group_by(sub, item) %>%
+  mutate(
+    word= as.numeric(word),
+    max_word_fixated = cummax(word),
+    prev_max_word_fixated = lag(max_word_fixated,
+                                default = first(word)),
+    next_fixated_word = lead(word),
+    
+    GPT_terminated = ifelse(
+      !is.na(next_fixated_word) &
+        next_fixated_word > max_word_fixated,
+      1, 0
+    ),
+    
+    fixations_left = ifelse(
+      word < prev_max_word_fixated,
+      1, 0
+    ),
+    
+    # New segment each time a new rightmost word is reached
+    GPT_segment = cumsum(word > lag(max_word_fixated, default = -Inf))
+  ) %>%
+  group_by(GPT_segment) %>%
+  mutate(
+    # Has there already been a regression left from this current max word?
+    has_regressed_left_from_max = lag(
+      cumany(word < max_word_fixated),
+      default = FALSE
+    ),
+    
+    refixations_GPT = ifelse(
+      word == max_word_fixated &
+        has_regressed_left_from_max,
+      1, 0
+    )
+  ) %>%
+  ungroup()
+
+# select only "left" fixations contributing to GPT:
+has_left<- fixations %>% filter(fixations_left==1)
+
+## compute aggregate "left time" for each word:
+left_comp<- has_left%>%
+          group_by(sub, item, max_word_fixated)%>%
+          summarise(Sum_left= sum(fix_dur),
+                    N_left= n())
+
+### Merge two columns:
+colnames(left_comp)<- c("sub", "item",
+                        "word",
+                        "Sum_left", "N_left")
+
+dat2<- dat%>% 
+  left_join(left_comp, 
+            by= c('sub', 'item', 'word'))%>%
+  mutate(GPT_Refix= GPT-GD-Sum_left)
+  
+
+
+save(dat2, file= "data/Provo.Rda")
+write.csv(dat2, "Data/Provo.csv")
+
+
